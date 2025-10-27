@@ -1,0 +1,96 @@
+/**
+ * Main Routes Index
+ *
+ * This module serves as the central routing hub for the API.
+ * All route modules are imported and mounted here, providing a single
+ * entry point for the entire API route structure.
+ *
+ * Route organization:
+ * - /api/auth - Authentication routes (login, register, refresh token)
+ * - /api/users - User management routes
+ * - /api/notebooks - Notebook CRUD operations
+ * - /api/pages - Page management within notebooks
+ * - /api/elements - Page elements (text, images)
+ * - /api/export - Export functionality (PDF generation)
+ *
+ * @module routes/index
+ */
+
+import { Router } from 'express';
+import { logger } from '../utils/logger';
+
+/**
+ * Main API router
+ * All routes will be prefixed with /api (configured in app.ts)
+ */
+const router = Router();
+
+/**
+ * Root API endpoint
+ * Provides API information and available endpoints
+ */
+router.get('/', (_req, res) => {
+  res.json({
+    message: 'Welcome to Ithaka API',
+    version: '1.0.0',
+    documentation: '/api/docs', // Future Swagger documentation URL
+    endpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
+      notebooks: '/api/notebooks',
+      pages: '/api/pages',
+      elements: '/api/elements',
+      export: '/api/export',
+    },
+  });
+});
+
+/**
+ * Authentication Routes
+ * Handles user registration, login, logout, token refresh, and password reset
+ */
+import authRoutes from './authRoutes';
+router.use('/auth', authRoutes);
+
+/**
+ * User Routes
+ * Handles user profile management (view, update, password change)
+ */
+import userRoutes from './userRoutes';
+router.use('/users', userRoutes);
+
+/**
+ * Notebook Routes
+ * TODO: Import and mount notebook routes when implemented
+ * Example:
+ * import notebookRoutes from './notebookRoutes';
+ * router.use('/notebooks', notebookRoutes);
+ */
+
+/**
+ * Page Routes
+ * TODO: Import and mount page routes when implemented
+ * Example:
+ * import pageRoutes from './pageRoutes';
+ * router.use('/pages', pageRoutes);
+ */
+
+/**
+ * Element Routes
+ * TODO: Import and mount element routes when implemented
+ * Example:
+ * import elementRoutes from './elementRoutes';
+ * router.use('/elements', elementRoutes);
+ */
+
+/**
+ * Export Routes
+ * TODO: Import and mount export routes when implemented
+ * Example:
+ * import exportRoutes from './exportRoutes';
+ * router.use('/export', exportRoutes);
+ */
+
+logger.info('Routes initialized');
+
+export default router;

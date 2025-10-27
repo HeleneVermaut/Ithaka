@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    // Configuration TypeScript spécifique pour les fichiers de configuration Node.js
+    // (vite.config.ts, vitest.config.ts, etc.)
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

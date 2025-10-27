@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    // Configuration de base pour Vue 3 avec TypeScript
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    // Configuration des modules : permet l'import de fichiers .vue
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+
+    // Mode strict : active toutes les vérifications TypeScript strictes
+    // Cela garantit la qualité du code et évite les erreurs à l'exécution
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Alias de chemin : permet d'utiliser @ pour référencer src/
+    // Exemple : import { MyComponent } from '@/components/MyComponent.vue'
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    // Support des types pour Node.js et Vitest
+    "types": ["vite/client", "vitest/globals"]
+  },
+  // Fichiers à inclure dans la compilation TypeScript
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue"
+  ],
+  // Fichiers à exclure de la compilation
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
+  // Référence au fichier de configuration pour Node.js
+  "references": [
+    { "path": "./tsconfig.node.json" }
+  ]
+}
