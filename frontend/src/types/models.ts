@@ -366,3 +366,267 @@ export interface PasswordStrengthResult {
   /** Suggestions pour améliorer le mot de passe */
   suggestions: string[]
 }
+
+// ========================================
+// PAGE MODEL (US03 - Page Editing)
+// ========================================
+
+/**
+ * Représente une page unique dans un notebook
+ *
+ * Une page est une unité de contenu qui peut contenir
+ * plusieurs éléments (texte, images, stickers, etc.)
+ */
+export interface IPage {
+  /** Identifiant unique de la page (UUID) */
+  id: string
+
+  /** Identifiant du notebook parent (UUID) */
+  notebookId: string
+
+  /** Numéro séquentiel de la page dans le notebook (1, 2, 3...) */
+  pageNumber: number
+
+  /** Indique si c'est une couverture personnalisée */
+  isCustomCover: boolean
+
+  /** Date de création de la page (ISO 8601) */
+  createdAt: string
+
+  /** Date de dernière modification de la page (ISO 8601) */
+  updatedAt: string
+}
+
+// ========================================
+// PAGE ELEMENT MODEL
+// ========================================
+
+/**
+ * Type énumération pour les types d'éléments de page
+ */
+export type ElementType = 'text' | 'image' | 'shape' | 'emoji' | 'sticker' | 'moodTracker'
+
+/**
+ * Contenu d'un élément texte
+ *
+ * Propriétés spécifiques pour les éléments de type 'text'
+ */
+export interface ITextContent {
+  /** Texte à afficher (max 1000 caractères) */
+  text: string
+
+  /** Police typographique Google Font */
+  fontFamily: string
+
+  /** Taille de la police en pixels (8-200) */
+  fontSize: number
+
+  /** Couleur du texte en hexadécimal (#RRGGBB) */
+  fill: string
+
+  /** Alignement horizontal du texte (optionnel) */
+  textAlign?: 'left' | 'center' | 'right'
+
+  /** Poids de la police (optionnel) */
+  fontWeight?: 'normal' | 'bold'
+
+  /** Style de la police (optionnel) */
+  fontStyle?: 'normal' | 'italic'
+
+  /** Indique si le texte est souligné (optionnel) */
+  underline?: boolean
+
+  /** Hauteur de ligne (optionnel) */
+  lineHeight?: number
+}
+
+/**
+ * Style d'un élément de page
+ *
+ * Propriétés visuelles communes à tous les éléments
+ */
+export interface ITextStyle {
+  /** Opacité de l'élément (0-1) */
+  opacity?: number
+
+  /** Ombre de l'élément (optionnel) */
+  shadow?: {
+    offsetX: number
+    offsetY: number
+    blur: number
+    color: string
+  }
+}
+
+/**
+ * Représente un élément unique sur une page
+ *
+ * Un élément peut être du texte, une image, un sticker, etc.
+ * Tous les éléments partagent les propriétés de positionnement et d'apparence.
+ */
+export interface IPageElement {
+  /** Identifiant unique de l'élément (UUID) */
+  id: string
+
+  /** Identifiant de la page parent (UUID) */
+  pageId: string
+
+  /** Type d'élément (text, image, shape, emoji, sticker, moodTracker) */
+  type: ElementType
+
+  /** Position X du coin supérieur gauche en millimètres */
+  x: number
+
+  /** Position Y du coin supérieur gauche en millimètres */
+  y: number
+
+  /** Largeur de l'élément en millimètres */
+  width: number
+
+  /** Hauteur de l'élément en millimètres */
+  height: number
+
+  /** Rotation de l'élément en degrés (-180 à 180) */
+  rotation: number
+
+  /** Ordre d'affichage sur la page (0 = arrière, croissant vers l'avant) */
+  zIndex: number
+
+  /** Contenu spécifique à l'élément (structure dépend du type) */
+  content: Record<string, any>
+
+  /** Style de l'élément (couleur, opacité, ombre, etc.) */
+  style: Record<string, any>
+
+  /** Propriétés personnalisées optionnelles */
+  metadata?: Record<string, any>
+
+  /** Date de création de l'élément (ISO 8601) */
+  createdAt: string
+
+  /** Date de dernière modification de l'élément (ISO 8601) */
+  updatedAt: string
+
+  /** Date de suppression douce (soft delete, paranoid mode) */
+  deletedAt?: string | null
+}
+
+/**
+ * Requête pour créer un nouvel élément de page
+ *
+ * Utilisé pour le formulaire de création d'élément
+ */
+export interface IPageElementCreateRequest {
+  /** Type d'élément */
+  type: ElementType
+
+  /** Position X en millimètres */
+  x: number
+
+  /** Position Y en millimètres */
+  y: number
+
+  /** Largeur en millimètres */
+  width: number
+
+  /** Hauteur en millimètres */
+  height: number
+
+  /** Rotation en degrés (optionnel) */
+  rotation?: number
+
+  /** Ordre d'affichage (optionnel, auto-attribué) */
+  zIndex?: number
+
+  /** Contenu de l'élément */
+  content: Record<string, any>
+
+  /** Style de l'élément (optionnel) */
+  style?: Record<string, any>
+
+  /** Métadonnées personnalisées (optionnel) */
+  metadata?: Record<string, any>
+}
+
+/**
+ * Requête pour mettre à jour un élément existant
+ *
+ * Tous les champs sont optionnels (mise à jour partielle)
+ */
+export interface IPageElementUpdateRequest {
+  /** Position X (optionnel) */
+  x?: number
+
+  /** Position Y (optionnel) */
+  y?: number
+
+  /** Largeur (optionnel) */
+  width?: number
+
+  /** Hauteur (optionnel) */
+  height?: number
+
+  /** Rotation (optionnel) */
+  rotation?: number
+
+  /** Ordre d'affichage (optionnel) */
+  zIndex?: number
+
+  /** Contenu (optionnel) */
+  content?: Record<string, any>
+
+  /** Style (optionnel) */
+  style?: Record<string, any>
+
+  /** Métadonnées (optionnel) */
+  metadata?: Record<string, any>
+}
+
+// ========================================
+// SAVED TEXT LIBRARY (US03 Extension)
+// ========================================
+
+/**
+ * Type d'élément de texte sauvegardé
+ */
+export type SavedTextType = 'citation' | 'poeme' | 'libre'
+
+/**
+ * Représente un texte sauvegardé dans la bibliothèque de l'utilisateur
+ *
+ * Permet à l'utilisateur de réutiliser du texte pré-formaté
+ */
+export interface ISavedText {
+  /** Identifiant unique du texte sauvegardé (UUID) */
+  id: string
+
+  /** Étiquette/titre du texte sauvegardé (max 100 caractères) */
+  label: string
+
+  /** Type de texte (citation, poème, libre) */
+  type: SavedTextType
+
+  /** Contenu formaté du texte */
+  content: ITextContent
+
+  /** Date de création (ISO 8601) */
+  createdAt: string
+
+  /** Date de dernière modification (ISO 8601) */
+  updatedAt: string
+}
+
+// ========================================
+// PAGE API RESPONSE TYPES
+// ========================================
+
+/**
+ * Réponse de la requête de création/mise à jour batch d'éléments
+ */
+export interface BatchElementsResponse {
+  /** Nombre d'éléments créés */
+  created: number
+
+  /** Nombre d'éléments mis à jour */
+  updated: number
+}

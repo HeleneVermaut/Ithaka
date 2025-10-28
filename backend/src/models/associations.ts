@@ -19,6 +19,8 @@
 import { User } from './User';
 import { Notebook } from './Notebook';
 import { NotebookPermissions } from './NotebookPermissions';
+import { Page } from './Page';
+import { PageElement } from './PageElement';
 
 /**
  * Initialize all model associations
@@ -51,9 +53,29 @@ export function initializeAssociations(): void {
     as: 'notebook',
   });
 
-  // Future associations:
-  // Notebook.hasMany(Page, { foreignKey: 'notebookId', as: 'pages', onDelete: 'CASCADE' });
-  // Page.hasMany(PageElement, { foreignKey: 'pageId', as: 'elements', onDelete: 'CASCADE' });
+  // Notebook <-> Page (one-to-many) - US03
+  Notebook.hasMany(Page, {
+    foreignKey: 'notebookId',
+    as: 'pages',
+    onDelete: 'CASCADE',
+  });
+
+  Page.belongsTo(Notebook, {
+    foreignKey: 'notebookId',
+    as: 'notebook',
+  });
+
+  // Page <-> PageElement (one-to-many) - US03
+  Page.hasMany(PageElement, {
+    foreignKey: 'pageId',
+    as: 'elements',
+    onDelete: 'CASCADE',
+  });
+
+  PageElement.belongsTo(Page, {
+    foreignKey: 'pageId',
+    as: 'page',
+  });
 }
 
 // Initialize associations when this module is imported

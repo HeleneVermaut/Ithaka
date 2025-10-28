@@ -76,20 +76,11 @@ import legalRoutes from './legalRoutes';
 router.use('/legal', legalRoutes);
 
 /**
- * Page Routes
- * TODO: Import and mount page routes when implemented
- * Example:
- * import pageRoutes from './pageRoutes';
- * router.use('/pages', pageRoutes);
+ * Page and Element Routes
+ * Handles page CRUD operations and page element management
  */
-
-/**
- * Element Routes
- * TODO: Import and mount element routes when implemented
- * Example:
- * import elementRoutes from './elementRoutes';
- * router.use('/elements', elementRoutes);
- */
+import pageRoutes from './pageRoutes';
+router.use(pageRoutes);
 
 /**
  * Export Routes

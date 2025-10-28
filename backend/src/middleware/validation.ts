@@ -437,6 +437,324 @@ export const updateNotebookSchema = Joi.object({
 });
 
 /**
+ * Joi schema for creating a page
+ * Validates page number and custom cover flag for page creation
+ */
+export const createPageSchema = Joi.object({
+  pageNumber: Joi.number()
+    .integer()
+    .min(1)
+    .required()
+    .messages({
+      'number.base': 'Page number must be a number',
+      'number.integer': 'Page number must be an integer',
+      'number.min': 'Page number must be at least 1',
+      'any.required': 'Page number is required',
+    }),
+
+  isCustomCover: Joi.boolean()
+    .optional()
+    .default(false)
+    .messages({
+      'boolean.base': 'isCustomCover must be a boolean',
+    }),
+});
+
+/**
+ * Joi schema for updating a page
+ * Only mutable fields (pageNumber, isCustomCover) are allowed
+ */
+export const updatePageSchema = Joi.object({
+  pageNumber: Joi.number()
+    .integer()
+    .min(1)
+    .optional()
+    .messages({
+      'number.base': 'Page number must be a number',
+      'number.integer': 'Page number must be an integer',
+      'number.min': 'Page number must be at least 1',
+    }),
+
+  isCustomCover: Joi.boolean()
+    .optional()
+    .messages({
+      'boolean.base': 'isCustomCover must be a boolean',
+    }),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+});
+
+/**
+ * Joi schema for page element (canvas element)
+ * Validates type, positioning, sizing, and content/styling properties
+ */
+export const pageElementSchema = Joi.object({
+  type: Joi.string()
+    .valid('text', 'image', 'shape', 'emoji', 'sticker', 'moodTracker')
+    .required()
+    .messages({
+      'any.required': 'Element type is required',
+      'any.only': 'Type must be one of: text, image, shape, emoji, sticker, moodTracker',
+    }),
+
+  x: Joi.number()
+    .min(0)
+    .required()
+    .messages({
+      'number.base': 'X coordinate must be a number',
+      'number.min': 'X coordinate must be >= 0',
+      'any.required': 'X coordinate is required',
+    }),
+
+  y: Joi.number()
+    .min(0)
+    .required()
+    .messages({
+      'number.base': 'Y coordinate must be a number',
+      'number.min': 'Y coordinate must be >= 0',
+      'any.required': 'Y coordinate is required',
+    }),
+
+  width: Joi.number()
+    .greater(0)
+    .required()
+    .messages({
+      'number.base': 'Width must be a number',
+      'number.greater': 'Width must be greater than 0',
+      'any.required': 'Width is required',
+    }),
+
+  height: Joi.number()
+    .greater(0)
+    .required()
+    .messages({
+      'number.base': 'Height must be a number',
+      'number.greater': 'Height must be greater than 0',
+      'any.required': 'Height is required',
+    }),
+
+  rotation: Joi.number()
+    .min(-180)
+    .max(180)
+    .optional()
+    .default(0)
+    .messages({
+      'number.base': 'Rotation must be a number',
+      'number.min': 'Rotation must be >= -180',
+      'number.max': 'Rotation must be <= 180',
+    }),
+
+  zIndex: Joi.number()
+    .integer()
+    .min(0)
+    .optional()
+    .messages({
+      'number.base': 'Z-index must be a number',
+      'number.integer': 'Z-index must be an integer',
+      'number.min': 'Z-index must be >= 0',
+    }),
+
+  content: Joi.object()
+    .required()
+    .messages({
+      'object.base': 'Content must be an object',
+      'any.required': 'Content is required',
+    }),
+
+  style: Joi.object()
+    .optional()
+    .default({})
+    .messages({
+      'object.base': 'Style must be an object',
+    }),
+
+  metadata: Joi.object()
+    .optional()
+    .allow(null)
+    .messages({
+      'object.base': 'Metadata must be an object',
+    }),
+});
+
+/**
+ * Joi schema for text element content
+ * Validates text-specific properties when type === 'text'
+ */
+export const textElementSchema = pageElementSchema.append({
+  content: Joi.object({
+    text: Joi.string()
+      .max(1000)
+      .required()
+      .messages({
+        'string.max': 'Text must not exceed 1000 characters',
+        'any.required': 'Text is required',
+      }),
+
+    fontFamily: Joi.string()
+      .required()
+      .messages({
+        'any.required': 'Font family is required',
+      }),
+
+    fontSize: Joi.number()
+      .min(8)
+      .max(200)
+      .required()
+      .messages({
+        'number.base': 'Font size must be a number',
+        'number.min': 'Font size must be at least 8',
+        'number.max': 'Font size must not exceed 200',
+        'any.required': 'Font size is required',
+      }),
+
+    fill: Joi.string()
+      .pattern(/^#[0-9A-Fa-f]{6}$/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Fill color must be a valid hex color (#RRGGBB)',
+        'any.required': 'Fill color is required',
+      }),
+
+    textAlign: Joi.string()
+      .valid('left', 'center', 'right')
+      .optional()
+      .messages({
+        'any.only': 'Text align must be one of: left, center, right',
+      }),
+
+    fontWeight: Joi.string()
+      .valid('normal', 'bold')
+      .optional()
+      .messages({
+        'any.only': 'Font weight must be one of: normal, bold',
+      }),
+
+    fontStyle: Joi.string()
+      .valid('normal', 'italic')
+      .optional()
+      .messages({
+        'any.only': 'Font style must be one of: normal, italic',
+      }),
+
+    underline: Joi.boolean()
+      .optional()
+      .messages({
+        'boolean.base': 'Underline must be a boolean',
+      }),
+
+    lineHeight: Joi.number()
+      .optional()
+      .messages({
+        'number.base': 'Line height must be a number',
+      }),
+  }).required(),
+});
+
+/**
+ * Joi schema for batch element create/update operations
+ * Array of elements where each can be a new element or update
+ * New elements: no id field
+ * Update elements: include id field
+ */
+export const batchElementsSchema = Joi.array()
+  .items(
+    pageElementSchema.append({
+      id: Joi.string()
+        .uuid()
+        .optional()
+        .messages({
+          'string.uuid': 'Element ID must be a valid UUID',
+        }),
+    }),
+  )
+  .min(1)
+  .max(100)
+  .messages({
+    'array.base': 'Elements must be an array',
+    'array.min': 'At least one element must be provided',
+    'array.max': 'Cannot process more than 100 elements at once',
+  });
+
+/**
+ * Joi schema for updating a single page element
+ * Only mutable fields are allowed (x, y, width, height, rotation, zIndex, content, style, metadata)
+ */
+export const updateElementSchema = Joi.object({
+  x: Joi.number()
+    .min(0)
+    .optional()
+    .messages({
+      'number.base': 'X coordinate must be a number',
+      'number.min': 'X coordinate must be >= 0',
+    }),
+
+  y: Joi.number()
+    .min(0)
+    .optional()
+    .messages({
+      'number.base': 'Y coordinate must be a number',
+      'number.min': 'Y coordinate must be >= 0',
+    }),
+
+  width: Joi.number()
+    .greater(0)
+    .optional()
+    .messages({
+      'number.base': 'Width must be a number',
+      'number.greater': 'Width must be greater than 0',
+    }),
+
+  height: Joi.number()
+    .greater(0)
+    .optional()
+    .messages({
+      'number.base': 'Height must be a number',
+      'number.greater': 'Height must be greater than 0',
+    }),
+
+  rotation: Joi.number()
+    .min(-180)
+    .max(180)
+    .optional()
+    .messages({
+      'number.base': 'Rotation must be a number',
+      'number.min': 'Rotation must be >= -180',
+      'number.max': 'Rotation must be <= 180',
+    }),
+
+  zIndex: Joi.number()
+    .integer()
+    .min(0)
+    .optional()
+    .messages({
+      'number.base': 'Z-index must be a number',
+      'number.integer': 'Z-index must be an integer',
+      'number.min': 'Z-index must be >= 0',
+    }),
+
+  content: Joi.object()
+    .optional()
+    .messages({
+      'object.base': 'Content must be an object',
+    }),
+
+  style: Joi.object()
+    .optional()
+    .messages({
+      'object.base': 'Style must be an object',
+    }),
+
+  metadata: Joi.object()
+    .optional()
+    .allow(null)
+    .messages({
+      'object.base': 'Metadata must be an object',
+    }),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+});
+
+/**
  * Validation middleware factory
  *
  * Creates a middleware function that validates request data against a Joi schema.
@@ -514,5 +832,11 @@ export default {
   resetPasswordSchema,
   createNotebookSchema,
   updateNotebookSchema,
+  createPageSchema,
+  updatePageSchema,
+  pageElementSchema,
+  textElementSchema,
+  batchElementsSchema,
+  updateElementSchema,
   sanitizeEmail,
 };
