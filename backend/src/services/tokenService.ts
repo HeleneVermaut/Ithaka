@@ -76,7 +76,6 @@ const getCookieOptions = (maxAge: number): CookieOptions => {
  * // In login controller
  * const tokens = await setAuthTokens(res, {
  *   userId: user.id,
- *   email: user.email,
  *   role: 'user'
  * });
  * // Tokens are now set in cookies automatically
@@ -197,7 +196,7 @@ export const verifyToken = (token: string): DecodedJWT => {
  *   // Generate new access token
  *   const newAccessToken = generateAccessToken({
  *     userId: decoded.userId,
- *     email: decoded.email
+ *     role: decoded.role
  *   });
  * } catch (error) {
  *   // Refresh token expired, require login
@@ -245,7 +244,6 @@ export const refreshAccessToken = async (
     // Generate new access token with same payload
     const newAccessToken = generateAccessToken({
       userId: decoded.userId,
-      email: decoded.email,
       role: decoded.role,
     });
 

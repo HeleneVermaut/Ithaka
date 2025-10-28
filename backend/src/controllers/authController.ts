@@ -92,7 +92,6 @@ export const register = async (
     // Generate and set JWT tokens in cookies
     await setAuthTokens(res, {
       userId: user.id,
-      email: user.email,
       role: 'user',
     });
 
@@ -155,7 +154,6 @@ export const login = async (
     // Generate and set JWT tokens in cookies
     await setAuthTokens(res, {
       userId: user.id,
-      email: user.email,
       role: 'user',
     });
 

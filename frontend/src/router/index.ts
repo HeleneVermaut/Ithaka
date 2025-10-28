@@ -61,6 +61,24 @@ const routes: RouteRecordRaw[] = [
       title: 'Tableau de bord'
     }
   },
+  {
+    path: '/notebooks',
+    name: 'MyNotebooks',
+    component: () => import('@/views/MyNotebooks.vue'),
+    meta: {
+      requiresAuth: true, // Cette route nécessite une authentification
+      title: 'Mes Carnets'
+    }
+  },
+  {
+    path: '/privacy-policy',
+    name: 'PrivacyPolicy',
+    component: () => import('@/views/legal/PrivacyPolicyView.vue'),
+    meta: {
+      requiresAuth: false, // Accessible sans authentification (GDPR requirement)
+      title: 'Politique de Confidentialité'
+    }
+  },
   // Route 404 - Doit être en dernière position
   {
     path: '/:pathMatch(.*)*',

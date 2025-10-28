@@ -14,6 +14,10 @@
  * @module config/database
  */
 
+// Load environment variables first
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Sequelize } from 'sequelize';
 import { logger } from '../utils/logger';
 

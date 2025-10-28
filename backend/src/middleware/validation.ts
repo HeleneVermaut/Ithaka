@@ -292,6 +292,151 @@ export const resetPasswordSchema = Joi.object({
 });
 
 /**
+ * Joi schema for creating a new notebook
+ * Validates all required fields for notebook creation
+ *
+ * Required fields:
+ * - title: 1-100 characters, trimmed
+ * - type: Must be 'Voyage', 'Daily', or 'Reportage'
+ * - format: Must be 'A4' or 'A5'
+ * - orientation: Must be 'portrait' or 'landscape'
+ *
+ * Optional fields:
+ * - description: Max 300 characters, trimmed
+ * - dpi: Integer between 72 and 600 (default 300 in service layer)
+ * - coverImageUrl: Valid URI, max 2048 characters
+ */
+export const createNotebookSchema = Joi.object({
+  title: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      'string.empty': 'Title is required',
+      'any.required': 'Title is required',
+      'string.min': 'Title must be at least 1 character',
+      'string.max': 'Title must not exceed 100 characters',
+    }),
+
+  description: Joi.string()
+    .trim()
+    .max(300)
+    .optional()
+    .allow('')
+    .messages({
+      'string.max': 'Description must not exceed 300 characters',
+    }),
+
+  type: Joi.string()
+    .valid('Voyage', 'Daily', 'Reportage')
+    .required()
+    .messages({
+      'any.required': 'Notebook type is required',
+      'any.only': 'Type must be one of: Voyage, Daily, Reportage',
+    }),
+
+  format: Joi.string()
+    .valid('A4', 'A5')
+    .required()
+    .messages({
+      'any.required': 'Notebook format is required',
+      'any.only': 'Format must be one of: A4, A5',
+    }),
+
+  orientation: Joi.string()
+    .valid('portrait', 'landscape')
+    .required()
+    .messages({
+      'any.required': 'Notebook orientation is required',
+      'any.only': 'Orientation must be one of: portrait, landscape',
+    }),
+
+  dpi: Joi.number()
+    .integer()
+    .min(72)
+    .max(600)
+    .optional()
+    .messages({
+      'number.base': 'DPI must be a number',
+      'number.integer': 'DPI must be an integer',
+      'number.min': 'DPI must be at least 72',
+      'number.max': 'DPI must not exceed 600',
+    }),
+
+  coverImageUrl: Joi.string()
+    .uri()
+    .max(2048)
+    .optional()
+    .allow('')
+    .messages({
+      'string.uri': 'Cover image URL must be a valid URI',
+      'string.max': 'Cover image URL must not exceed 2048 characters',
+    }),
+});
+
+/**
+ * Joi schema for updating a notebook
+ * Only mutable fields are allowed to be updated
+ *
+ * Mutable fields (all optional):
+ * - title: 1-100 characters, trimmed
+ * - description: Max 300 characters, trimmed
+ * - coverImageUrl: Valid URI, max 2048 characters
+ * - dpi: Integer between 72 and 600
+ *
+ * Immutable fields (will be rejected if present):
+ * - type, format, orientation are NOT allowed in update
+ * - These are set at creation time and cannot be changed
+ * - The schema uses stripUnknown to remove any disallowed fields
+ */
+export const updateNotebookSchema = Joi.object({
+  title: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional()
+    .messages({
+      'string.empty': 'Title cannot be empty',
+      'string.min': 'Title must be at least 1 character',
+      'string.max': 'Title must not exceed 100 characters',
+    }),
+
+  description: Joi.string()
+    .trim()
+    .max(300)
+    .optional()
+    .allow('')
+    .messages({
+      'string.max': 'Description must not exceed 300 characters',
+    }),
+
+  coverImageUrl: Joi.string()
+    .uri()
+    .max(2048)
+    .optional()
+    .allow('')
+    .messages({
+      'string.uri': 'Cover image URL must be a valid URI',
+      'string.max': 'Cover image URL must not exceed 2048 characters',
+    }),
+
+  dpi: Joi.number()
+    .integer()
+    .min(72)
+    .max(600)
+    .optional()
+    .messages({
+      'number.base': 'DPI must be a number',
+      'number.integer': 'DPI must be an integer',
+      'number.min': 'DPI must be at least 72',
+      'number.max': 'DPI must not exceed 600',
+    }),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+});
+
+/**
  * Validation middleware factory
  *
  * Creates a middleware function that validates request data against a Joi schema.
@@ -367,5 +512,7 @@ export default {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  createNotebookSchema,
+  updateNotebookSchema,
   sanitizeEmail,
 };

@@ -550,6 +550,139 @@ export const logoutUser = async (userId: string): Promise<void> => {
   }
 };
 
+/**
+ * Delete user account and all associated data
+ * GDPR Article 17 - Right to erasure (Right to be forgotten)
+ *
+ * This function permanently deletes a user account and all associated data:
+ * - User profile and credentials
+ * - Password reset tokens
+ * - TODO: Notebooks, pages, and other user content when implemented
+ *
+ * For GDPR compliance, deletion is logged for audit purposes.
+ *
+ * @async
+ * @param {string} userId - User's unique identifier
+ * @param {string} password - User's password for confirmation (security measure)
+ * @returns {Promise<void>}
+ * @throws {AppError} If user not found or password invalid
+ *
+ * @example
+ * await deleteUserAccount(userId, 'MySecurePassword123');
+ * // User and all associated data permanently deleted
+ */
+export const deleteUserAccount = async (
+  userId: string,
+  password: string
+): Promise<void> => {
+  // Verify user exists and password is correct
+  const user = await User.findByPk(userId);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Verify password before deletion (security measure)
+  const isValidPassword = await comparePasswords(password, user.passwordHash);
+  if (!isValidPassword) {
+    logger.warn('Account deletion attempt with invalid password', {
+      userId,
+      email: user.email,
+    });
+    throw new AppError('Invalid password', 401);
+  }
+
+  // Log deletion for audit trail (GDPR requires logging of deletions)
+  logger.info('User account deletion requested (GDPR Art. 17)', {
+    userId,
+    email: user.email,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    // Delete associated data in order (respect foreign keys)
+    // Note: If password reset tokens were in a separate table, delete them here
+    // TODO: Delete notebooks, pages, shared notebooks when implemented
+
+    // Finally delete user (force: true for hard delete, paranoid would soft delete)
+    await user.destroy({ force: true });
+
+    logger.info('User account successfully deleted', {
+      userId,
+      gdprCompliance: 'GDPR Article 17 - Right to erasure',
+    });
+  } catch (error) {
+    logger.error('Error deleting user account:', error);
+    throw new AppError('Failed to delete user account', 500);
+  }
+};
+
+/**
+ * Export user data in structured format
+ * GDPR Article 20 - Right to data portability
+ *
+ * This function exports all user data in a structured, machine-readable format (JSON).
+ * Users have the right to receive their personal data and transmit it to another controller.
+ *
+ * @async
+ * @param {string} userId - User's unique identifier
+ * @returns {Promise<object>} User data in JSON format
+ * @throws {AppError} If user not found
+ *
+ * @example
+ * const data = await exportUserData(userId);
+ * // Returns: { exportDate, gdprCompliance, user: {...}, notebooks: [...] }
+ */
+export const exportUserData = async (userId: string): Promise<object> => {
+  const user = await User.findByPk(userId, {
+    attributes: [
+      'id',
+      'email',
+      'firstName',
+      'lastName',
+      'avatarBase64',
+      'createdAt',
+      'updatedAt',
+      'lastLoginAt',
+      'lastLogoutAt',
+    ],
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // TODO: Include notebooks, pages when implemented
+  // const notebooks = await Notebook.findAll({ where: { userId } });
+
+  const exportData = {
+    exportDate: new Date().toISOString(),
+    gdprCompliance:
+      'Data export in accordance with GDPR Article 20 - Right to data portability',
+    format: 'JSON',
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatarBase64: user.avatarBase64,
+      accountCreated: user.createdAt,
+      lastUpdated: user.updatedAt,
+      lastLogin: user.lastLoginAt,
+      lastLogout: user.lastLogoutAt,
+    },
+    notebooks: [], // TODO: Add when notebooks implemented
+    // statistics: {}, // TODO: Add usage stats if available
+  };
+
+  logger.info('User data export generated (GDPR Art. 20)', {
+    userId,
+    email: user.email,
+  });
+
+  return exportData;
+};
+
 export default {
   hashPassword,
   comparePasswords,
@@ -561,4 +694,6 @@ export default {
   changePassword,
   updateUserProfile,
   logoutUser,
+  deleteUserAccount,
+  exportUserData,
 };

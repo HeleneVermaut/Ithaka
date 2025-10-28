@@ -60,19 +60,19 @@ const bootstrapApp = async (): Promise<void> => {
   // ========================================
 
   /**
-   * Vérifie si un token JWT existe dans le localStorage
+   * Vérifie si un token JWT existe dans les cookies httpOnly
    * et restaure la session de l'utilisateur si possible.
    *
    * Cela permet de rester connecté même après fermeture du navigateur.
+   * Si le token est expiré ou invalide, l'utilisateur restera simplement déconnecté.
    */
   const authStore = useAuthStore()
-
   try {
-    await authStore.restoreSession()
-    console.log('Session restoration complete')
+    await authStore.fetchProfile()
+    console.log('Session restored successfully')
   } catch (error) {
-    console.warn('Session restoration failed:', error)
-    // L'erreur est déjà gérée dans le store (logout automatique)
+    // Token expiré ou invalide - l'utilisateur reste déconnecté (comportement normal)
+    console.warn('No active session, user will need to login')
   }
 
   // ========================================

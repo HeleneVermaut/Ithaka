@@ -411,6 +411,43 @@ const authService = {
       params: { pseudo }
     })
     return response.data
+  },
+
+  /**
+   * Export user data in JSON format (GDPR Article 20 - Right to data portability)
+   *
+   * Envoie une requête GET /api/users/export pour télécharger toutes les données utilisateur
+   * dans un format structuré et lisible par machine (JSON).
+   *
+   * Le backend retourne un fichier JSON avec :
+   * - Informations de profil utilisateur
+   * - Carnets de voyage créés
+   * - Date d'export et conformité GDPR
+   *
+   * @returns Promise contenant les données utilisateur en Blob (pour téléchargement)
+   *
+   * @throws ApiError si l'utilisateur n'est pas authentifié (401) ou erreur serveur (500)
+   *
+   * @example
+   * try {
+   *   const blob = await authService.exportUserData()
+   *   // Créer un lien de téléchargement
+   *   const url = window.URL.createObjectURL(blob)
+   *   const link = document.createElement('a')
+   *   link.href = url
+   *   link.download = `ithaka-export-${Date.now()}.json`
+   *   link.click()
+   *   window.URL.revokeObjectURL(url)
+   * } catch (error) {
+   *   console.error('Erreur export données:', error)
+   * }
+   */
+  async exportUserData(): Promise<Blob> {
+    const response = await apiClient.get('/api/users/export', {
+      responseType: 'blob', // Important: Recevoir les données en Blob pour téléchargement
+      withCredentials: true
+    })
+    return response.data
   }
 }
 

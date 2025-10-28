@@ -19,6 +19,7 @@ import {
   updateProfile,
   updatePassword,
   deleteAccount,
+  exportData,
 } from '../controllers/userController';
 import { authenticateUser } from '../middleware/authMiddleware';
 import {
@@ -123,7 +124,7 @@ router.put(
 
 /**
  * @route   DELETE /api/users/profile
- * @desc    Delete user account (soft delete)
+ * @desc    Delete user account (GDPR Article 17 - Right to erasure)
  * @access  Private (requires JWT authentication)
  *
  * Request body:
@@ -134,12 +135,32 @@ router.put(
  * Response: 200 OK
  * {
  *   success: true,
- *   message: "Account deleted successfully"
+ *   message: "Account successfully deleted",
+ *   gdprCompliance: "Data deletion completed in accordance with GDPR Article 17"
  * }
  *
- * Note: This is a soft delete - user data is retained with deletedAt timestamp
- * Account can potentially be recovered by contacting support
+ * Note: This permanently deletes all user data for GDPR compliance
  */
 router.delete('/profile', deleteAccount);
+
+/**
+ * @route   GET /api/users/export
+ * @desc    Export user data in JSON format (GDPR Article 20 - Right to data portability)
+ * @access  Private (requires JWT authentication)
+ *
+ * Response: 200 OK
+ * Content-Type: application/json
+ * Content-Disposition: attachment; filename="ithaka-export-{timestamp}.json"
+ * {
+ *   exportDate: string (ISO 8601),
+ *   gdprCompliance: "Data export in accordance with GDPR Article 20",
+ *   format: "JSON",
+ *   user: { id, email, firstName, lastName, profilePicture, ... },
+ *   notebooks: [ ... ]
+ * }
+ *
+ * Note: Returns all user data in machine-readable format for portability
+ */
+router.get('/export', exportData);
 
 export default router;

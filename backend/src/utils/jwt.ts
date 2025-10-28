@@ -20,14 +20,16 @@ import { logger } from './logger';
  * Interface defining the data stored in a JWT token (the "payload")
  * This is the user information we embed in the token
  *
+ * Security: Email is NOT included in JWT to comply with GDPR data minimization.
+ * JWT tokens can be decoded without the secret key, so PII should not be stored.
+ * If email is needed, retrieve it from the database using userId.
+ *
  * @interface JWTPayload
  * @property {string} userId - The unique identifier of the user (UUID)
- * @property {string} email - The user's email address
  * @property {string} [role] - Optional user role (e.g., 'user', 'admin')
  */
 export interface JWTPayload {
   userId: string;
-  email: string;
   role?: string;
 }
 
@@ -58,8 +60,7 @@ export interface DecodedJWT extends JWTPayload {
  *
  * @example
  * const token = generateAccessToken({
- *   userId: 123,
- *   email: 'user@example.com',
+ *   userId: '123e4567-e89b-12d3-a456-426614174000',
  *   role: 'user'
  * });
  * // Returns: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
@@ -102,8 +103,8 @@ export const generateAccessToken = (payload: JWTPayload): string => {
  *
  * @example
  * const refreshToken = generateRefreshToken({
- *   userId: 123,
- *   email: 'user@example.com'
+ *   userId: '123e4567-e89b-12d3-a456-426614174000',
+ *   role: 'user'
  * });
  */
 export const generateRefreshToken = (payload: JWTPayload): string => {
@@ -193,7 +194,7 @@ export const verifyAccessToken = (token: string): DecodedJWT => {
  *   const decoded = verifyRefreshToken(refreshToken);
  *   const newAccessToken = generateAccessToken({
  *     userId: decoded.userId,
- *     email: decoded.email
+ *     role: decoded.role
  *   });
  * } catch (error) {
  *   // Require user to log in again
@@ -239,8 +240,8 @@ export const verifyRefreshToken = (token: string): DecodedJWT => {
  *
  * @example
  * const tokens = generateTokenPair({
- *   userId: 123,
- *   email: 'user@example.com'
+ *   userId: '123e4567-e89b-12d3-a456-426614174000',
+ *   role: 'user'
  * });
  * // Set tokens in cookies
  * res.cookie('accessToken', tokens.accessToken, { httpOnly: true });

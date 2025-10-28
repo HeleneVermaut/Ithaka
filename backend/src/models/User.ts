@@ -104,22 +104,22 @@ export interface UserCreationAttributes
  * @extends Model<IUser, UserCreationAttributes>
  */
 export class User extends Model<IUser, UserCreationAttributes> implements IUser {
-  public id!: string;
-  public email!: string;
-  public passwordHash!: string;
-  public firstName!: string;
-  public lastName!: string;
-  public pseudo?: string;
-  public bio?: string;
-  public avatarBase64?: string;
-  public isEmailVerified!: boolean;
-  public passwordResetToken?: string;
-  public passwordResetExpiry?: Date;
-  public lastLoginAt?: Date;
-  public lastLogoutAt?: Date;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
-  public readonly deletedAt?: Date;
+  declare id: string;
+  declare email: string;
+  declare passwordHash: string;
+  declare firstName: string;
+  declare lastName: string;
+  declare pseudo?: string;
+  declare bio?: string;
+  declare avatarBase64?: string;
+  declare isEmailVerified: boolean;
+  declare passwordResetToken?: string;
+  declare passwordResetExpiry?: Date;
+  declare lastLoginAt?: Date;
+  declare lastLogoutAt?: Date;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+  declare readonly deletedAt?: Date;
 
   /**
    * Get user's full name
@@ -349,5 +349,15 @@ User.init(
     ],
   }
 );
+
+/**
+ * Define associations
+ *
+ * Note: Associations are defined in src/models/associations.ts to avoid circular dependencies.
+ *
+ * Relationships:
+ * - User has many Notebooks (one user can own multiple notebooks)
+ * - When a User is deleted, all their Notebooks are cascade deleted
+ */
 
 export default User;

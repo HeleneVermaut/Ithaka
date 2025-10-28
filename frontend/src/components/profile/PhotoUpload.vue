@@ -15,8 +15,7 @@
  */
 
 import { ref, computed } from 'vue'
-import { NUpload, NAvatar, NText, NIcon } from 'naive-ui'
-import { CloudUploadOutline } from '@vicons/ionicons5'
+import { NAvatar, NText } from 'naive-ui'
 import { convertFileToBase64, validateImageFile } from '@/composables/useValidation'
 
 // ========================================
@@ -174,11 +173,7 @@ const removeImage = () => {
       />
 
       <div class="photo-upload__content">
-        <n-icon
-          :size="48"
-          :component="CloudUploadOutline"
-          class="photo-upload__icon"
-        />
+        <div class="photo-upload__icon">📤</div>
         <n-text class="photo-upload__text">
           Glissez une photo ici ou cliquez pour sélectionner
         </n-text>

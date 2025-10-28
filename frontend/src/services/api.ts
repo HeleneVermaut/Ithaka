@@ -66,14 +66,45 @@ apiClient.interceptors.request.use(
 )
 
 /**
- * Intercepteur de réponse : Gère les erreurs HTTP globalement
+ * État de gestion du refresh token
+ * Permet d'éviter les boucles infinies et de gérer la queue de requêtes
+ */
+let isRefreshing = false
+let failedQueue: Array<{
+  resolve: (value?: unknown) => void
+  reject: (reason?: unknown) => void
+}> = []
+
+/**
+ * Traite la queue de requêtes en attente après un refresh réussi ou échoué
+ */
+const processQueue = (error: Error | null, token: string | null = null): void => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token)
+    }
+  })
+  failedQueue = []
+}
+
+/**
+ * Intercepteur de réponse : Gère les erreurs HTTP et l'auto-refresh des tokens
  *
  * Cet intercepteur s'exécute APRÈS chaque réponse HTTP.
  * Il permet de centraliser la gestion des erreurs :
- * - 401 Unauthorized : Déconnexion automatique
+ * - 401 Unauthorized : Auto-refresh du token ou déconnexion
  * - 403 Forbidden : Accès refusé
  * - 404 Not Found : Ressource introuvable
  * - 500 Server Error : Erreur serveur
+ *
+ * AUTO-REFRESH FLOW:
+ * 1. Requête échoue avec 401
+ * 2. Interceptor appelle automatiquement /api/auth/refresh
+ * 3. Si refresh réussit : réessayer la requête originale
+ * 4. Si refresh échoue : déconnecter l'utilisateur
+ * 5. Gestion d'une queue pour éviter plusieurs appels refresh simultanés
  */
 apiClient.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => {
@@ -89,18 +120,74 @@ apiClient.interceptors.response.use(
     // Retourne la réponse sans modification si tout va bien
     return response
   },
-  (error: AxiosError<ApiError>): Promise<AxiosError<ApiError>> => {
+  async (error: AxiosError<ApiError>): Promise<any> => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+
     // Gestion des erreurs HTTP
     if (error.response) {
       const status = error.response.status
       const errorData = error.response.data
 
-      // 401 Unauthorized : Token expiré ou invalide
-      if (status === 401) {
-        console.warn('Authentication error - Token expired or invalid')
-        // Note: Les tokens httpOnly sont automatiquement supprimés par le backend
-        // La redirection sera gérée par le router avec les guards
-        // Le store Pinia sera également nettoyé par le guard de navigation
+      // 401 Unauthorized : Tentative d'auto-refresh du token
+      if (status === 401 && originalRequest && !originalRequest._retry) {
+        // Éviter l'auto-refresh sur l'endpoint /auth/refresh lui-même
+        if (originalRequest.url?.includes('/auth/refresh')) {
+          console.warn('Refresh token expired - User will be logged out')
+          return Promise.reject(error)
+        }
+
+        // Si un refresh est déjà en cours, mettre cette requête en queue
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject })
+          })
+            .then(() => {
+              // Marquer la requête comme déjà réessayée pour éviter les boucles infinies
+              originalRequest._retry = true
+              // Réessayer la requête originale après le refresh
+              return apiClient(originalRequest)
+            })
+            .catch((err) => {
+              return Promise.reject(err)
+            })
+        }
+
+        // Marquer que cette requête a déjà été réessayée
+        originalRequest._retry = true
+        isRefreshing = true
+
+        try {
+          console.log('Access token expired - Attempting auto-refresh')
+
+          // Appeler l'endpoint de refresh
+          await apiClient.post('/auth/refresh')
+
+          console.log('Token refresh successful - Retrying original request')
+
+          // Refresh réussi, traiter la queue
+          processQueue(null, null)
+          isRefreshing = false
+
+          // Réessayer la requête originale avec le nouveau token
+          return apiClient(originalRequest)
+        } catch (refreshError) {
+          // Refresh échoué (refresh token expiré ou invalide)
+          console.error('Token refresh failed:', refreshError)
+          processQueue(refreshError as Error, null)
+          isRefreshing = false
+
+          // Déconnecter l'utilisateur
+          // Note: L'import dynamique évite les dépendances circulaires
+          const { useAuthStore } = await import('@/stores/auth')
+          const authStore = useAuthStore()
+          await authStore.logout()
+
+          // Rediriger vers login
+          const { default: router } = await import('@/router')
+          router.push('/login')
+
+          return Promise.reject(refreshError)
+        }
       }
 
       // 403 Forbidden : L'utilisateur n'a pas les permissions
@@ -110,7 +197,7 @@ apiClient.interceptors.response.use(
 
       // 404 Not Found : La ressource demandée n'existe pas
       if (status === 404) {
-        console.warn('Resource not found:', error.response.config.url)
+        console.warn('Resource not found:', error.response.config?.url)
       }
 
       // 500 Server Error : Erreur interne du serveur

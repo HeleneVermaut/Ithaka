@@ -35,3 +35,16 @@ coverage
 
 # Build output
 dist
+
+# Playwright E2E Testing
+# SECURITY: Never commit authentication state files
+e2e/.auth/
+e2e/**/.auth/
+**/e2e/.auth/**
+playwright-report/
+test-results/
+.playwright/
+
+# E2E Test Environment Variables
+.env.test
+.env.e2e

@@ -26,7 +26,7 @@ export default defineConfig({
 
   // Configuration du serveur de développement
   server: {
-    port: 3000, // Port du serveur de développement
+    port: 3001, // Port du serveur de développement (le backend utilise 3000)
     host: true, // Écoute sur toutes les interfaces réseau (0.0.0.0)
     strictPort: true, // Échoue si le port est déjà utilisé
     open: false // N'ouvre pas automatiquement le navigateur

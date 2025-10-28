@@ -38,6 +38,7 @@ router.get('/', (_req, res) => {
       auth: '/api/auth',
       users: '/api/users',
       notebooks: '/api/notebooks',
+      legal: '/api/legal',
       pages: '/api/pages',
       elements: '/api/elements',
       export: '/api/export',
@@ -61,11 +62,18 @@ router.use('/users', userRoutes);
 
 /**
  * Notebook Routes
- * TODO: Import and mount notebook routes when implemented
- * Example:
- * import notebookRoutes from './notebookRoutes';
- * router.use('/notebooks', notebookRoutes);
+ * Handles notebook CRUD operations (create, read, update, delete)
  */
+import notebookRoutes from './notebookRoutes';
+router.use('/notebooks', notebookRoutes);
+
+/**
+ * Legal Routes
+ * Handles legal documents (privacy policy, terms of service)
+ * GDPR compliance - Articles 13 & 14
+ */
+import legalRoutes from './legalRoutes';
+router.use('/legal', legalRoutes);
 
 /**
  * Page Routes

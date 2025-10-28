@@ -17,7 +17,7 @@ const authStore = useAuthStore()
 const message = useMessage()
 
 // Récupération de l'utilisateur connecté
-const currentUser = computed(() => authStore.currentUser)
+const currentUser = computed(() => authStore.user)
 
 /**
  * Déconnexion de l'utilisateur
@@ -30,6 +30,21 @@ const handleLogout = (): void => {
   message.info('Vous êtes maintenant déconnecté')
   router.push({ name: 'Home' })
 }
+
+/**
+ * Export user data (GDPR Article 20 - Right to data portability)
+ *
+ * Télécharge toutes les données utilisateur dans un fichier JSON
+ */
+const handleExportData = async (): Promise<void> => {
+  try {
+    await authStore.exportData()
+    message.success('Vos données ont été exportées avec succès')
+  } catch (error) {
+    message.error('Erreur lors de l\'export des données')
+    console.error('Export error:', error)
+  }
+}
 </script>
 
 <template>
@@ -41,7 +56,7 @@ const handleLogout = (): void => {
           <div>
             <n-h1 class="dashboard__title">Tableau de bord</n-h1>
             <n-p class="dashboard__subtitle">
-              Bienvenue, {{ currentUser?.username }} !
+              Bienvenue, {{ currentUser?.firstName }} {{ currentUser?.lastName }} !
             </n-p>
           </div>
           <n-button @click="handleLogout" size="large">
@@ -56,14 +71,24 @@ const handleLogout = (): void => {
       <div class="container">
         <n-card class="dashboard__card">
           <n-h1>Vos carnets de voyage</n-h1>
-          <n-p>Cette section affichera vos carnets de voyage.</n-p>
-          <n-p class="text-secondary">
-            Fonctionnalité à venir dans les prochaines étapes du développement.
-          </n-p>
+          <n-p>Gérez tous vos carnets de voyage depuis un seul endroit.</n-p>
 
           <n-space class="dashboard__actions" justify="center">
-            <n-button type="primary" size="large">
-              Créer un nouveau carnet
+            <n-button
+              type="primary"
+              size="large"
+              @click="router.push({ name: 'MyNotebooks' })"
+            >
+              Voir mes carnets
+            </n-button>
+
+            <n-button
+              type="default"
+              size="large"
+              @click="handleExportData"
+              :loading="authStore.loading"
+            >
+              Exporter mes données (GDPR)
             </n-button>
           </n-space>
         </n-card>

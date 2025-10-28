@@ -19,6 +19,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import routes from './routes';
@@ -97,8 +98,21 @@ const createApp = (): Application => {
    * Cookie Parser Middleware
    * Parse cookies from request headers
    * Required for JWT authentication with httpOnly cookies
+   *
+   * Security: COOKIE_SECRET is required in production to prevent session forgery.
+   * In development, a random secret is generated automatically.
    */
-  const cookieSecret = process.env['COOKIE_SECRET'] || 'default-cookie-secret-change-in-production';
+  let cookieSecret = process.env['COOKIE_SECRET'];
+
+  if (!cookieSecret) {
+    if (process.env['NODE_ENV'] === 'production') {
+      throw new Error('COOKIE_SECRET must be defined in production environment');
+    }
+    // Generate random secret in development
+    logger.warn('COOKIE_SECRET not set, generating random secret for development');
+    cookieSecret = crypto.randomBytes(32).toString('hex');
+  }
+
   app.use(cookieParser(cookieSecret));
 
   /**

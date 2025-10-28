@@ -14,7 +14,11 @@
 
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { updateUserProfile, changePassword } from '../services/authService';
+import {
+  updateUserProfile,
+  changePassword,
+  exportUserData,
+} from '../services/authService';
 import { User } from '../models/User';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -310,9 +314,62 @@ export const deleteAccount = async (
   }
 };
 
+/**
+ * Export user data in structured format
+ * GDPR Article 20 - Right to data portability
+ *
+ * GET /api/users/export
+ * Requires: JWT authentication
+ *
+ * Returns all user data in JSON format for download.
+ * User can then import this data to another service.
+ *
+ * @async
+ * @param {AuthRequest} req - Express request with authenticated user
+ * @param {Response} res - Express response object
+ * @param {NextFunction} next - Express next function
+ *
+ * @example
+ * // Success response (200 OK)
+ * // Content-Type: application/json
+ * // Content-Disposition: attachment; filename="ithaka-export-{timestamp}.json"
+ * {
+ *   "exportDate": "2025-01-28T10:30:00.000Z",
+ *   "gdprCompliance": "Data export in accordance with GDPR Article 20",
+ *   "user": { ... },
+ *   "notebooks": [ ... ]
+ * }
+ */
+export const exportData = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new AppError('User not authenticated', 401);
+    }
+
+    // Generate export data using centralized service (GDPR compliant)
+    const data = await exportUserData(userId);
+
+    // Set headers for file download
+    const filename = `ithaka-export-${Date.now()}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    res.status(200).json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getProfile,
   updateProfile,
   updatePassword,
   deleteAccount,
+  exportData,
 };

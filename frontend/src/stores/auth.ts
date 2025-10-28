@@ -562,6 +562,66 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * Export user data in JSON format
+   * GDPR Article 20 - Right to data portability
+   *
+   * Appelle authService.exportUserData pour télécharger toutes les données utilisateur
+   * dans un fichier JSON structuré.
+   *
+   * Le fichier contient :
+   * - Informations de profil
+   * - Carnets de voyage
+   * - Métadonnées d'export (date, version, conformité GDPR)
+   *
+   * Le téléchargement se fait automatiquement via un lien temporaire.
+   *
+   * @returns Promise<void>
+   * @throws Error si l'export échoue
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await authStore.exportData()
+   *   // Le fichier JSON est automatiquement téléchargé
+   * } catch (err) {
+   *   console.error('Erreur export:', authStore.error)
+   * }
+   * ```
+   */
+  const exportData = async (): Promise<void> => {
+    loading.value = true
+    error.value = null
+
+    try {
+      // Appel API pour récupérer les données en Blob
+      const blob = await authService.exportUserData()
+
+      // Créer un lien de téléchargement temporaire
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `ithaka-export-${Date.now()}.json`
+      link.click()
+
+      // Nettoyer l'URL temporaire
+      window.URL.revokeObjectURL(url)
+
+      console.log('User data exported successfully (GDPR Art. 20)')
+    } catch (err: unknown) {
+      // Gestion des erreurs
+      if (err instanceof Error) {
+        error.value = err.message
+      } else {
+        error.value = 'Erreur lors de l\'export des données'
+      }
+      console.error('Export failed:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ========================================
   // EXPORT DU STORE
   // ========================================
@@ -585,6 +645,7 @@ export const useAuthStore = defineStore('auth', () => {
     forgotPassword,
     resetPassword,
     checkEmailUnique,
-    checkPseudoUnique
+    checkPseudoUnique,
+    exportData
   }
 })
