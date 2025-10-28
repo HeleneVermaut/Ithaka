@@ -71,6 +71,15 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/notebooks/:notebookId/edit/:pageId',
+    name: 'PageEditor',
+    component: () => import('@/views/PageEditor.vue'),
+    meta: {
+      requiresAuth: true, // Cette route nécessite une authentification
+      title: 'Editeur de Page'
+    }
+  },
+  {
     path: '/privacy-policy',
     name: 'PrivacyPolicy',
     component: () => import('@/views/legal/PrivacyPolicyView.vue'),

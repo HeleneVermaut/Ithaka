@@ -443,3 +443,223 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
 
   return { valid: true }
 }
+
+/**
+ * SECTION: Validations pour les éléments texte
+ * ===============================================
+ *
+ * Fonctions de validation pour l'édition de texte dans le canvas
+ * Utilisées par le composant TextPanel et les validations en temps réel
+ */
+
+/**
+ * Résultat de validation pour les textes
+ */
+export interface TextValidationResult {
+  valid: boolean
+  error?: string
+}
+
+/**
+ * Valide le contenu textuel
+ *
+ * Règles:
+ * - Texte non vide requis (au moins 1 caractère non-espace)
+ * - Maximum 1000 caractères
+ *
+ * @param text - Le texte à valider
+ * @returns Résultat de validation avec message d'erreur si invalide
+ *
+ * @example
+ * const result = validateTextContent('Hello World')
+ * if (result.valid) {
+ *   console.log('Texte accepté')
+ * } else {
+ *   console.error(result.error)
+ * }
+ */
+export function validateTextContent(text: string): TextValidationResult {
+  // Vérifier que le texte n'est pas vide (ou seulement des espaces)
+  if (!text || text.trim().length === 0) {
+    return {
+      valid: false,
+      error: 'Le texte ne peut pas être vide'
+    }
+  }
+
+  // Vérifier la longueur maximale
+  if (text.length > 1000) {
+    return {
+      valid: false,
+      error: `Le texte dépasse la limite de 1000 caractères (${text.length}/1000)`
+    }
+  }
+
+  // Le texte est valide
+  return {
+    valid: true
+  }
+}
+
+/**
+ * Valide la taille de police
+ *
+ * Règles:
+ * - Doit être un nombre
+ * - Minimum 8px
+ * - Maximum 200px
+ *
+ * @param size - La taille de police en pixels (nombre ou chaîne convertible)
+ * @returns Résultat de validation avec message d'erreur si invalide
+ *
+ * @example
+ * const result = validateFontSize(16)
+ * if (result.valid) {
+ *   console.log('Taille acceptée')
+ * }
+ */
+export function validateFontSize(size: number | string): TextValidationResult {
+  // Convertir en nombre si c'est une chaîne
+  const numSize = typeof size === 'string' ? parseFloat(size) : size
+
+  // Vérifier que c'est un nombre valide
+  if (isNaN(numSize)) {
+    return {
+      valid: false,
+      error: 'La taille doit être un nombre valide'
+    }
+  }
+
+  // Vérifier le minimum
+  if (numSize < 8) {
+    return {
+      valid: false,
+      error: 'La taille minimale est 8px'
+    }
+  }
+
+  // Vérifier le maximum
+  if (numSize > 200) {
+    return {
+      valid: false,
+      error: 'La taille maximale est 200px'
+    }
+  }
+
+  // La taille est valide
+  return {
+    valid: true
+  }
+}
+
+/**
+ * Valide une couleur au format HEX
+ *
+ * Formats acceptés:
+ * - #RGB (ex: #F00)
+ * - #RRGGBB (ex: #FF0000)
+ * - #RRGGBBAA (ex: #FF0000FF) - avec alpha
+ *
+ * Règles:
+ * - Doit commencer par #
+ * - Doit contenir 3, 6 ou 8 caractères hexadécimaux après le #
+ *
+ * @param color - La couleur au format HEX
+ * @returns Résultat de validation avec message d'erreur si invalide
+ *
+ * @example
+ * const result = validateColorHex('#FF0000')
+ * if (result.valid) {
+ *   console.log('Couleur acceptée')
+ * }
+ */
+export function validateColorHex(color: string): TextValidationResult {
+  // Vérifier que la couleur n'est pas vide
+  if (!color || color.trim().length === 0) {
+    return {
+      valid: false,
+      error: 'La couleur ne peut pas être vide'
+    }
+  }
+
+  // Vérifier le format HEX complet (#RGB, #RRGGBB, ou #RRGGBBAA)
+  const hexRegex = /^#([0-9A-F]{3}|[0-9A-F]{6}|[0-9A-F]{8})$/i
+
+  if (!hexRegex.test(color)) {
+    return {
+      valid: false,
+      error:
+        'La couleur doit être au format HEX valide (#RGB, #RRGGBB, ou #RRGGBBAA). Exemple: #FF0000'
+    }
+  }
+
+  // La couleur est valide
+  return {
+    valid: true
+  }
+}
+
+/**
+ * Valide tous les paramètres d'un élément texte en une seule fonction
+ *
+ * @param params - Objet contenant text, fontSize, color
+ * @returns Objet avec chaque champ validé individuellement
+ *
+ * @example
+ * const validation = validateTextElement({
+ *   text: 'Hello',
+ *   fontSize: 16,
+ *   color: '#FF0000'
+ * })
+ * if (validation.text.valid && validation.fontSize.valid && validation.color.valid) {
+ *   console.log('Tous les champs sont valides')
+ * }
+ */
+export function validateTextElement(params: {
+  text: string
+  fontSize: number | string
+  color: string
+}): Record<string, TextValidationResult> {
+  return {
+    text: validateTextContent(params.text),
+    fontSize: validateFontSize(params.fontSize),
+    color: validateColorHex(params.color)
+  }
+}
+
+/**
+ * Vérifie si un objet de validation est complètement valide
+ * (tous les champs doivent avoir valid: true)
+ *
+ * @param validationResults - Objet contenant les résultats de validation
+ * @returns true si tous les champs sont valides
+ *
+ * @example
+ * const validation = validateTextElement({...})
+ * if (isAllTextValidationValid(validation)) {
+ *   // Procéder à la création du texte
+ * }
+ */
+export function isAllTextValidationValid(
+  validationResults: Record<string, TextValidationResult>
+): boolean {
+  return Object.values(validationResults).every((result) => result.valid)
+}
+
+/**
+ * Extrait tous les messages d'erreur d'un objet de validation texte
+ *
+ * @param validationResults - Objet contenant les résultats de validation
+ * @returns Tableau des messages d'erreur
+ *
+ * @example
+ * const errors = getTextValidationErrors(validation)
+ * errors.forEach(error => console.error(error))
+ */
+export function getTextValidationErrors(
+  validationResults: Record<string, TextValidationResult>
+): string[] {
+  return Object.values(validationResults)
+    .filter((result) => !result.valid && result.error)
+    .map((result) => result.error as string)
+}

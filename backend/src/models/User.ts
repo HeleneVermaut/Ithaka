@@ -18,6 +18,56 @@ import { DataTypes, Model, Optional, Op } from 'sequelize';
 import { sequelize } from '../config/database';
 
 /**
+ * Saved text element in user's library
+ * Represents a frequently-used text configuration that can be reused across notebooks
+ *
+ * @interface SavedText
+ */
+export interface SavedText {
+  /** Unique identifier (UUID) for this saved text */
+  id: string;
+
+  /** User-friendly label/name for this saved text (e.g., "Chapter Title", "Poem Title") */
+  label: string;
+
+  /** The text content (max 1000 characters) */
+  content: string;
+
+  /** Font size in pixels (8-200) */
+  fontSize: number;
+
+  /** Font family name (Google Font or system font) */
+  fontFamily: string;
+
+  /** Font weight: "normal", "bold", "600", "700" */
+  fontWeight: string;
+
+  /** Font style: "normal", "italic" */
+  fontStyle: string;
+
+  /** Text decoration: "none", "underline", "line-through" */
+  textDecoration: string;
+
+  /** HEX color code (e.g., "#000000") */
+  color: string;
+
+  /** Text alignment: "left", "center", "right" */
+  textAlign: string;
+
+  /** Line height multiplier (e.g., 1.5 for 1.5x spacing) */
+  lineHeight: number;
+
+  /** Optional category/tag (e.g., "title", "quote", "poem") */
+  type?: string;
+
+  /** Timestamp when this text was saved */
+  createdAt: Date;
+
+  /** Timestamp of last update */
+  updatedAt: Date;
+}
+
+/**
  * Interface defining all fields in the User model
  * This represents the complete structure of a user record in the database
  *
@@ -63,6 +113,9 @@ export interface IUser {
   /** Timestamp of last logout */
   lastLogoutAt?: Date;
 
+  /** User's personal library of saved text elements for reuse across notebooks */
+  savedTexts: SavedText[];
+
   /** Timestamp when record was created */
   createdAt: Date;
 
@@ -89,6 +142,7 @@ export interface UserCreationAttributes
     | 'passwordResetExpiry'
     | 'lastLoginAt'
     | 'lastLogoutAt'
+    | 'savedTexts'
     | 'createdAt'
     | 'updatedAt'
     | 'deletedAt'
@@ -117,6 +171,7 @@ export class User extends Model<IUser, UserCreationAttributes> implements IUser 
   declare passwordResetExpiry?: Date;
   declare lastLoginAt?: Date;
   declare lastLogoutAt?: Date;
+  declare savedTexts: SavedText[];
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
   declare readonly deletedAt?: Date;
@@ -296,6 +351,12 @@ User.init(
       type: DataTypes.DATE,
       allowNull: true,
       comment: 'Timestamp of last logout',
+    },
+    savedTexts: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+      comment: 'User personal library of saved text elements for reuse across notebooks',
     },
     createdAt: {
       type: DataTypes.DATE,

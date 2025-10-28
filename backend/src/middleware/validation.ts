@@ -755,6 +755,203 @@ export const updateElementSchema = Joi.object({
 });
 
 /**
+ * Joi schema for creating/validating a saved text
+ * Validates text elements for the user's personal library
+ */
+export const createSavedTextSchema = Joi.object({
+  label: Joi.string()
+    .required()
+    .trim()
+    .min(1)
+    .max(100)
+    .messages({
+      'any.required': 'Label is required',
+      'string.min': 'Label must be at least 1 character',
+      'string.max': 'Label must not exceed 100 characters',
+    }),
+
+  content: Joi.string()
+    .required()
+    .trim()
+    .min(1)
+    .max(1000)
+    .messages({
+      'any.required': 'Content is required',
+      'string.min': 'Content must be at least 1 character',
+      'string.max': 'Content must not exceed 1000 characters',
+    }),
+
+  fontSize: Joi.number()
+    .required()
+    .min(8)
+    .max(200)
+    .messages({
+      'any.required': 'Font size is required',
+      'number.min': 'Font size must be at least 8 pixels',
+      'number.max': 'Font size must not exceed 200 pixels',
+    }),
+
+  fontFamily: Joi.string()
+    .required()
+    .trim()
+    .messages({
+      'any.required': 'Font family is required',
+    }),
+
+  fontWeight: Joi.string()
+    .required()
+    .valid('normal', 'bold', '600', '700')
+    .messages({
+      'any.required': 'Font weight is required',
+      'any.only': 'Font weight must be one of: normal, bold, 600, 700',
+    }),
+
+  fontStyle: Joi.string()
+    .required()
+    .valid('normal', 'italic')
+    .messages({
+      'any.required': 'Font style is required',
+      'any.only': 'Font style must be one of: normal, italic',
+    }),
+
+  textDecoration: Joi.string()
+    .required()
+    .valid('none', 'underline', 'line-through')
+    .messages({
+      'any.required': 'Text decoration is required',
+      'any.only': 'Text decoration must be one of: none, underline, line-through',
+    }),
+
+  color: Joi.string()
+    .required()
+    .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/)
+    .messages({
+      'any.required': 'Color is required',
+      'string.pattern.base': 'Color must be a valid HEX code (e.g., #000000)',
+    }),
+
+  textAlign: Joi.string()
+    .required()
+    .valid('left', 'center', 'right')
+    .messages({
+      'any.required': 'Text alignment is required',
+      'any.only': 'Text alignment must be one of: left, center, right',
+    }),
+
+  lineHeight: Joi.number()
+    .required()
+    .min(0.8)
+    .max(3)
+    .messages({
+      'any.required': 'Line height is required',
+      'number.min': 'Line height must be at least 0.8',
+      'number.max': 'Line height must not exceed 3.0',
+    }),
+
+  type: Joi.string()
+    .optional()
+    .trim()
+    .messages({
+      'string.base': 'Type must be a string',
+    }),
+});
+
+/**
+ * Joi schema for updating a saved text
+ * All fields are optional; at least one field must be provided
+ */
+export const updateSavedTextSchema = Joi.object({
+  label: Joi.string()
+    .optional()
+    .trim()
+    .min(1)
+    .max(100)
+    .messages({
+      'string.min': 'Label must be at least 1 character',
+      'string.max': 'Label must not exceed 100 characters',
+    }),
+
+  content: Joi.string()
+    .optional()
+    .trim()
+    .min(1)
+    .max(1000)
+    .messages({
+      'string.min': 'Content must be at least 1 character',
+      'string.max': 'Content must not exceed 1000 characters',
+    }),
+
+  fontSize: Joi.number()
+    .optional()
+    .min(8)
+    .max(200)
+    .messages({
+      'number.min': 'Font size must be at least 8 pixels',
+      'number.max': 'Font size must not exceed 200 pixels',
+    }),
+
+  fontFamily: Joi.string()
+    .optional()
+    .trim()
+    .messages({
+      'string.base': 'Font family must be a string',
+    }),
+
+  fontWeight: Joi.string()
+    .optional()
+    .valid('normal', 'bold', '600', '700')
+    .messages({
+      'any.only': 'Font weight must be one of: normal, bold, 600, 700',
+    }),
+
+  fontStyle: Joi.string()
+    .optional()
+    .valid('normal', 'italic')
+    .messages({
+      'any.only': 'Font style must be one of: normal, italic',
+    }),
+
+  textDecoration: Joi.string()
+    .optional()
+    .valid('none', 'underline', 'line-through')
+    .messages({
+      'any.only': 'Text decoration must be one of: none, underline, line-through',
+    }),
+
+  color: Joi.string()
+    .optional()
+    .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/)
+    .messages({
+      'string.pattern.base': 'Color must be a valid HEX code (e.g., #000000)',
+    }),
+
+  textAlign: Joi.string()
+    .optional()
+    .valid('left', 'center', 'right')
+    .messages({
+      'any.only': 'Text alignment must be one of: left, center, right',
+    }),
+
+  lineHeight: Joi.number()
+    .optional()
+    .min(0.8)
+    .max(3)
+    .messages({
+      'number.min': 'Line height must be at least 0.8',
+      'number.max': 'Line height must not exceed 3.0',
+    }),
+
+  type: Joi.string()
+    .optional()
+    .trim()
+    .messages({
+      'string.base': 'Type must be a string',
+    }),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+});
+
+/**
  * Validation middleware factory
  *
  * Creates a middleware function that validates request data against a Joi schema.
@@ -838,5 +1035,7 @@ export default {
   textElementSchema,
   batchElementsSchema,
   updateElementSchema,
+  createSavedTextSchema,
+  updateSavedTextSchema,
   sanitizeEmail,
 };

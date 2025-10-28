@@ -97,6 +97,7 @@ const processQueue = (error: Error | null, token: string | null = null): void =>
  * - 401 Unauthorized : Auto-refresh du token ou déconnexion
  * - 403 Forbidden : Accès refusé
  * - 404 Not Found : Ressource introuvable
+ * - 408/TIMEOUT : Délai d'attente dépassé
  * - 500 Server Error : Erreur serveur
  *
  * AUTO-REFRESH FLOW:
@@ -105,6 +106,11 @@ const processQueue = (error: Error | null, token: string | null = null): void =>
  * 3. Si refresh réussit : réessayer la requête originale
  * 4. Si refresh échoue : déconnecter l'utilisateur
  * 5. Gestion d'une queue pour éviter plusieurs appels refresh simultanés
+ *
+ * TIMEOUT HANDLING:
+ * - Requests timeout after 30 seconds (30000ms)
+ * - ECONNABORTED indicates request was aborted due to timeout
+ * - Network errors show appropriate user-friendly messages
  */
 apiClient.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => {
@@ -122,6 +128,49 @@ apiClient.interceptors.response.use(
   },
   async (error: AxiosError<ApiError>): Promise<any> => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+
+    // ========================================
+    // TIMEOUT ERROR HANDLING
+    // ========================================
+
+    if (error.code === 'ECONNABORTED') {
+      console.error('Request timeout - exceeded 30 second limit')
+
+      // Create user-friendly timeout error
+      const timeoutError = new AxiosError(
+        'Délai d\'attente dépassé - La requête a pris trop longtemps. Vérifiez votre connexion Internet.',
+        'ECONNABORTED',
+        error.config,
+        error.request,
+        { status: 408, statusText: 'Request Timeout', data: null } as any
+      )
+
+      // Show timeout message if notifications available
+      if (typeof window !== 'undefined' && (window as any).$message) {
+        (window as any).$message.error('Connexion lente - Délai d\'attente dépassé')
+      }
+
+      return Promise.reject(timeoutError)
+    }
+
+    // ========================================
+    // NETWORK ERROR HANDLING
+    // ========================================
+
+    if (error.message === 'Network Error' && !error.response) {
+      console.error('Network error - No response from server')
+
+      // Show network error if notifications available
+      if (typeof window !== 'undefined' && (window as any).$message) {
+        (window as any).$message.error('Erreur réseau - Vérifiez votre connexion Internet')
+      }
+
+      return Promise.reject(error)
+    }
+
+    // ========================================
+    // HTTP ERROR HANDLING
+    // ========================================
 
     // Gestion des erreurs HTTP
     if (error.response) {
@@ -200,14 +249,29 @@ apiClient.interceptors.response.use(
         console.warn('Resource not found:', error.response.config?.url)
       }
 
+      // 408 Request Timeout
+      if (status === 408) {
+        console.error('Server request timeout')
+        if (typeof window !== 'undefined' && (window as any).$message) {
+          (window as any).$message.error('Délai d\'attente du serveur dépassé')
+        }
+      }
+
       // 500 Server Error : Erreur interne du serveur
       if (status >= 500) {
         console.error('Server error:', errorData)
+        if (typeof window !== 'undefined' && (window as any).$message) {
+          (window as any).$message.error('Erreur serveur - Veuillez réessayer plus tard')
+        }
       }
     } else if (error.request) {
       // La requête a été envoyée mais aucune réponse n'a été reçue
       // Cela peut arriver si le serveur est down ou si il y a un problème réseau
       console.error('No response from server - Network error or server down')
+
+      if (typeof window !== 'undefined' && (window as any).$message) {
+        (window as any).$message.error('Aucune réponse du serveur')
+      }
     } else {
       // Une erreur s'est produite lors de la configuration de la requête
       console.error('Request setup error:', error.message)

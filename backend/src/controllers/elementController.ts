@@ -49,11 +49,16 @@ export const handleGetPageElements = async (
 };
 
 /**
- * Batch create/update elements for a page
+ * Batch create/update elements for a page with automatic retry logic
  *
  * Processes array of elements:
  * - Elements without 'id' field are created
  * - Elements with 'id' field are updated
+ *
+ * Implements retry mechanism with exponential backoff:
+ * - Maximum 3 retry attempts
+ * - Delays: 1s, 2s, 4s (2^(n-1) * 1000ms)
+ * - Logs each retry attempt for debugging
  *
  * @route POST /api/pages/:pageId/elements
  * @param {Request} req - Express request with body: Array of elements
@@ -67,7 +72,7 @@ export const handleGetPageElements = async (
  *   { "type": "text", "x": 10, "y": 10, "width": 100, "height": 50, "content": {...} },
  *   { "id": "existing-id", "x": 20, "y": 20 }
  * ]
- * Response: { success: true, data: { created: 1, updated: 1 } }
+ * Response: { success: true, data: { created: 1, updated: 1, elements: [...] } }
  */
 export const handleBatchSaveElements = async (
   req: AuthRequest,
@@ -81,10 +86,14 @@ export const handleBatchSaveElements = async (
 
     logger.debug(`Batch saving ${elementsArray.length} elements for page: ${pageId}`);
 
-    const result = await elementService.createBatchElements(
-      pageId,
-      elementsArray,
-      userId
+    // Execute with retry logic
+    const result = await executeWithRetry(
+      () => elementService.createBatchElements(pageId, elementsArray, userId),
+      {
+        maxRetries: 3,
+        baseDelayMs: 1000,
+        operationName: `batch-save-elements-${pageId}`
+      }
     );
 
     res.status(201).json({
@@ -95,6 +104,73 @@ export const handleBatchSaveElements = async (
     next(error);
   }
 };
+
+/**
+ * Execute async operation with exponential backoff retry logic
+ *
+ * Automatically retries failed operations with exponential backoff delays.
+ * Useful for handling transient failures (network issues, temporary DB locks, etc.)
+ *
+ * @template T - Return type of the operation
+ * @param operation - Async function to execute
+ * @param options - Retry configuration options
+ * @returns Promise resolving to operation result
+ * @throws Error if operation fails after all retries
+ *
+ * @example
+ * const result = await executeWithRetry(
+ *   () => fetchUserData(userId),
+ *   { maxRetries: 3, baseDelayMs: 1000 }
+ * );
+ */
+async function executeWithRetry<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    baseDelayMs?: number;
+    operationName?: string;
+  } = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries || 3;
+  const baseDelayMs = options.baseDelayMs || 1000;
+  const operationName = options.operationName || 'operation';
+
+  let lastError: Error | null = null;
+  let currentAttempt = 0;
+
+  while (currentAttempt < maxRetries) {
+    currentAttempt++;
+
+    try {
+      logger.debug(`Executing ${operationName} (attempt ${currentAttempt}/${maxRetries})`);
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      const isLastAttempt = currentAttempt >= maxRetries;
+
+      if (isLastAttempt) {
+        logger.error(
+          `${operationName} failed after ${maxRetries} attempts:`,
+          error
+        );
+        throw error;
+      }
+
+      // Calculate exponential backoff delay: 2^(attempt-1) * baseDelayMs
+      const delayMs = Math.pow(2, currentAttempt - 1) * baseDelayMs;
+      logger.warn(
+        `${operationName} attempt ${currentAttempt} failed, retrying in ${delayMs}ms:`,
+        error.message
+      );
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  // This should not be reached, but throw error just in case
+  throw lastError || new Error(`${operationName} failed after ${maxRetries} attempts`);
+}
 
 /**
  * Update a single element

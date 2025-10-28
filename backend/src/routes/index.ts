@@ -55,10 +55,12 @@ router.use('/auth', authRoutes);
 
 /**
  * User Routes
- * Handles user profile management (view, update, password change)
+ * Handles user profile management (view, update, password change) and saved texts library
  */
 import userRoutes from './userRoutes';
+import savedTextsRoutes from './savedTextsRoutes';
 router.use('/users', userRoutes);
+router.use('/users/saved-texts', savedTextsRoutes);
 
 /**
  * Notebook Routes
