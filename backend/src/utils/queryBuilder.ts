@@ -55,12 +55,8 @@ export interface PaginationMetadata {
   totalPages: number;
   /** Current page number (1-indexed) */
   currentPage: number;
-  /** Number of items per page */
-  pageSize: number;
-  /** Whether there is a next page */
-  hasNext: boolean;
-  /** Whether there is a previous page */
-  hasPrev: boolean;
+  /** Number of items per page (limit) */
+  limit: number;
 }
 
 /**
@@ -364,9 +360,7 @@ export function buildPaginationParams(
  * //   total: 50,
  * //   totalPages: 5,
  * //   currentPage: 2,
- * //   pageSize: 12,
- * //   hasNext: true,
- * //   hasPrev: true
+ * //   limit: 12
  * // }
  *
  * @example
@@ -376,9 +370,7 @@ export function buildPaginationParams(
  * //   total: 0,
  * //   totalPages: 0,
  * //   currentPage: 1,
- * //   pageSize: 12,
- * //   hasNext: false,
- * //   hasPrev: false
+ * //   limit: 12
  * // }
  *
  * @example
@@ -388,9 +380,7 @@ export function buildPaginationParams(
  * //   total: 45,
  * //   totalPages: 4,
  * //   currentPage: 4,
- * //   pageSize: 12,
- * //   hasNext: false,
- * //   hasPrev: true
+ * //   limit: 12
  * // }
  */
 export function buildPaginationMetadata(
@@ -404,9 +394,7 @@ export function buildPaginationMetadata(
     total,
     totalPages,
     currentPage,
-    pageSize,
-    hasNext: currentPage < totalPages,
-    hasPrev: currentPage > 1,
+    limit: pageSize,
   };
 }
 
