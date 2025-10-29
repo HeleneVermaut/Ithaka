@@ -20,7 +20,20 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 import { sequelize } from '../config/database';
 import { User } from '../models/User';
+import { TokenBlacklist as _TokenBlacklist } from '../models/TokenBlacklist';
+import { Notebook as _Notebook } from '../models/Notebook';
+import { NotebookPermissions as _NotebookPermissions } from '../models/NotebookPermissions';
+import { Page as _Page } from '../models/Page';
+import { PageElement as _PageElement } from '../models/PageElement';
 import { logger } from '../utils/logger';
+import '../models/associations'; // Import associations to initialize relationships
+
+// Use models in void expressions to satisfy TypeScript while keeping side effects
+void _TokenBlacklist;
+void _Notebook;
+void _NotebookPermissions;
+void _Page;
+void _PageElement;
 
 /**
  * Synchronize database models

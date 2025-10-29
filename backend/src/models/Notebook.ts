@@ -104,21 +104,21 @@ export interface NotebookCreationAttributes
  * @extends Model<INotebook, NotebookCreationAttributes>
  */
 export class Notebook extends Model<INotebook, NotebookCreationAttributes> implements INotebook {
-  public id!: string;
-  public userId!: string;
-  public title!: string;
-  public description?: string;
-  public type!: 'Voyage' | 'Daily' | 'Reportage';
-  public format!: 'A4' | 'A5';
-  public orientation!: 'portrait' | 'landscape';
-  public dpi!: number;
-  public pageCount!: number;
-  public coverImageUrl?: string;
-  public status!: 'active' | 'archived';
-  public archivedAt?: Date;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
-  public readonly deletedAt?: Date;
+  declare id: string;
+  declare userId: string;
+  declare title: string;
+  declare description?: string;
+  declare type: 'Voyage' | 'Daily' | 'Reportage';
+  declare format: 'A4' | 'A5';
+  declare orientation: 'portrait' | 'landscape';
+  declare dpi: number;
+  declare pageCount: number;
+  declare coverImageUrl?: string;
+  declare status: 'active' | 'archived';
+  declare archivedAt?: Date;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+  declare readonly deletedAt?: Date;
 
   /**
    * Check if notebook is currently archived

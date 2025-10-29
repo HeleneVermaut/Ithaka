@@ -81,14 +81,14 @@ export class NotebookPermissions
   extends Model<INotebookPermissions, NotebookPermissionsCreationAttributes>
   implements INotebookPermissions
 {
-  public id!: string;
-  public notebookId!: string;
-  public type!: 'private' | 'public' | 'restricted';
-  public publicLink?: string;
-  public allowedEmails?: string[];
-  public allowedUserIds?: string[];
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare id: string;
+  declare notebookId: string;
+  declare type: 'private' | 'public' | 'restricted';
+  declare publicLink?: string;
+  declare allowedEmails?: string[];
+  declare allowedUserIds?: string[];
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
 
   /**
    * Check if notebook is private (owner only access)

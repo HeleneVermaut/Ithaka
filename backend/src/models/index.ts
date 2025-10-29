@@ -5,7 +5,7 @@
  * This centralizes model exports for cleaner imports throughout the application.
  *
  * Usage:
- * import { User, Notebook, NotebookPermissions, Page, PageElement } from './models';
+ * import { User, Notebook, NotebookPermissions, Page, PageElement, TokenBlacklist } from './models';
  *
  * @module models
  */
@@ -15,6 +15,7 @@ export { Notebook } from './Notebook';
 export { NotebookPermissions } from './NotebookPermissions';
 export { Page } from './Page'; // US03
 export { PageElement, type ElementType } from './PageElement'; // US03+
+export { TokenBlacklist, type ITokenBlacklist, type TokenBlacklistCreationAttributes } from './TokenBlacklist';
 
 // Initialize all model associations after models are loaded
 // This must be imported after model exports to avoid circular dependencies

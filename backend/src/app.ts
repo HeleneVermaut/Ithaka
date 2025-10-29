@@ -24,6 +24,13 @@ import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import routes from './routes';
 
+// Import all models to ensure they are initialized with Sequelize
+// This must be done before the app starts to ensure all tables exist
+import { User as _User, Notebook as _Notebook, NotebookPermissions as _NotebookPermissions, Page as _Page, PageElement as _PageElement, TokenBlacklist as _TokenBlacklist } from './models';
+
+// Use models in a void expression to satisfy TypeScript while keeping side effects
+void _User, _Notebook, _NotebookPermissions, _Page, _PageElement, _TokenBlacklist;
+
 /**
  * Create and configure Express application
  *
