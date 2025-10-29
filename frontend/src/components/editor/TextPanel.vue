@@ -187,6 +187,20 @@
           {{ isAdding ? 'Ajouter au canvas' : 'Modifier' }}
         </button>
         <button
+          v-if="isAdding"
+          type="button"
+          class="btn btn-library"
+          @click="openLibraryModal"
+          title="Ajouter un texte depuis votre bibliothèque"
+          data-testid="add-from-library-button"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          Ajouter depuis la bibliothèque
+        </button>
+        <button
           type="button"
           class="btn btn-secondary"
           @click="openSaveModal"
@@ -224,6 +238,19 @@
       @update:show="showSaveModal = $event"
       @save="handleSaveTextToLibrary"
     />
+
+    <!-- Text Library Modal -->
+    <n-modal
+      v-model:show="showLibraryModal"
+      preset="card"
+      title="Bibliothèque de Textes"
+      style="max-width: 900px; width: 90%"
+      :mask-closable="true"
+      :closable="true"
+      :segmented="{ content: true }"
+    >
+      <TextLibrary @use-text="handleUseTextFromLibrary" />
+    </n-modal>
   </div>
 </template>
 
@@ -235,9 +262,12 @@ import { validateTextContent, validateColorHex } from '@/composables/useValidati
 import TextPreview from './TextPreview.vue'
 import FontSelector from './FontSelector.vue'
 import SaveTextModal from '@/components/library/SaveTextModal.vue'
+import TextLibrary from '@/components/library/TextLibrary.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { Font } from '@/services/fontService'
+import type { ISavedText } from '@/types/models'
 import { ERROR_MESSAGES } from '@/constants/errorMessages'
+import { NModal } from 'naive-ui'
 
 /**
  * Props du composant
@@ -289,7 +319,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 /**
- * Auth store pour sauvegarder les textes
+ * Auth store pour sauvegarder les textes et accéder à la bibliothèque
  */
 const authStore = useAuthStore()
 
@@ -297,6 +327,12 @@ const authStore = useAuthStore()
  * État du modal de sauvegarde
  */
 const showSaveModal = ref<boolean>(false)
+
+/**
+ * État du modal de la bibliothèque de textes
+ * true = modal ouvert, false = modal fermé
+ */
+const showLibraryModal = ref<boolean>(false)
 
 /**
  * Options d'alignement disponibles
@@ -456,6 +492,62 @@ async function handleSubmit(): Promise<void> {
  */
 function openSaveModal(): void {
   showSaveModal.value = true
+}
+
+/**
+ * Ouvre le modal de la bibliothèque de textes
+ * Permet à l'utilisateur de sélectionner un texte pré-formaté
+ */
+function openLibraryModal(): void {
+  showLibraryModal.value = true
+}
+
+/**
+ * Traite l'utilisation d'un texte depuis la bibliothèque
+ * Appelé quand l'utilisateur sélectionne un texte dans TextLibrary
+ *
+ * Ce handler remplit le formulaire avec les données du texte sauvegardé,
+ * puis émet l'événement textAdded pour ajouter le texte au canvas
+ *
+ * @param {ISavedText} savedText - Texte sauvegardé sélectionné depuis la bibliothèque
+ */
+function handleUseTextFromLibrary(savedText: ISavedText): void {
+  try {
+    // Fermer le modal de la bibliothèque
+    showLibraryModal.value = false
+
+    // Extraire les données du texte sauvegardé
+    const { content } = savedText
+
+    // Déterminer le fontCategory par défaut (devrait être calculé par FontSelector)
+    // Pour l'instant, on utilise 'sans-serif' comme valeur par défaut
+    const fontCategory: Font['category'] = 'sans-serif'
+
+    // Construire les styles du texte
+    const textStyles = {
+      isBold: content.fontWeight === 'bold',
+      isItalic: content.fontStyle === 'italic',
+      isUnderline: content.underline || false
+    }
+
+    // Émettre l'événement pour ajouter le texte au canvas
+    // Le texte sera placé à une position par défaut déterminée par le composant parent
+    emit('textAdded',
+      content.text,
+      content.fontSize,
+      content.fill,
+      content.fontFamily,
+      fontCategory,
+      textStyles
+    )
+
+    // Afficher un message de succès
+    window.$message?.success('Texte ajouté depuis la bibliothèque')
+  } catch (error) {
+    // En cas d'erreur, afficher un message d'erreur et logger pour debug
+    window.$message?.error('Erreur lors de l\'ajout du texte depuis la bibliothèque')
+    console.error('Error using text from library:', error)
+  }
 }
 
 /**
@@ -813,6 +905,43 @@ async function handleSaveTextToLibrary(data: { label: string; type?: string }): 
 
   &:hover:not(:disabled) {
     background: #eeeeee;
+  }
+}
+
+.btn-library {
+  background: #8b5cf6;
+  color: white;
+  border: 1px solid #7c3aed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    background: #7c3aed;
+    border-color: #6d28d9;
+  }
+
+  &:active:not(:disabled) {
+    background: #6d28d9;
+  }
+}
+
+.btn-icon {
+  flex-shrink: 0;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  border: 1px solid #dc2626;
+
+  &:hover:not(:disabled) {
+    background: #dc2626;
+  }
+
+  &:active:not(:disabled) {
+    background: #b91c1c;
   }
 }
 

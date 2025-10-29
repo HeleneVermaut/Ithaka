@@ -28,6 +28,7 @@ import { NotebookPermissions } from '../models/NotebookPermissions';
 import { User } from '../models/User';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { createPage } from './pageService';
 import { sequelize } from '../config/database';
 import { Op } from 'sequelize';
 import {
@@ -137,7 +138,7 @@ export const createNotebook = async (
       format: data.format,
       orientation: data.orientation,
       dpi: data.dpi || 300, // Default to 300 DPI
-      pageCount: 0, // No pages initially
+      pageCount: 0, // No pages initially (will update to 1 after creating first page)
       coverImageUrl: data.coverImageUrl,
       status: 'active', // New notebooks are active
     });
@@ -148,6 +149,20 @@ export const createNotebook = async (
       type: 'private', // Default to private
     });
 
+    // 4. Create first page automatically
+    try {
+      await createPage(notebook.id, 1, false, userId);
+      // Update pageCount to 1
+      await notebook.update({ pageCount: 1 });
+    } catch (pageError) {
+      logger.warn('Failed to create first page for notebook', {
+        notebookId: notebook.id,
+        error: pageError,
+      });
+      // Don't fail the notebook creation if first page creation fails
+      // This prevents users from being blocked from creating notebooks
+    }
+
     logger.info('Notebook created successfully', {
       notebookId: notebook.id,
       userId: user.id,
@@ -155,7 +170,7 @@ export const createNotebook = async (
       type: notebook.type,
     });
 
-    // 4. Return notebook with associations
+    // 5. Return notebook with associations
     const notebookWithAssociations = await Notebook.findByPk(notebook.id, {
       include: [
         { model: NotebookPermissions, as: 'permissions' },

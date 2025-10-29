@@ -30,6 +30,7 @@ import {
 } from '@vicons/ionicons5'
 import { useNotebooksStore } from '@/stores/notebooks'
 import { useAuthStore } from '@/stores/auth'
+import { fetchNotebookPages } from '@/services/pageService'
 import NotebookFilters from '@/components/notebooks/NotebookFilters.vue'
 import NotebookGallery from '@/components/notebooks/NotebookGallery.vue'
 import CreateNotebookModal from '@/components/notebooks/CreateNotebookModal.vue'
@@ -214,10 +215,24 @@ const handlePageChange = async (page: number): Promise<void> => {
 }
 
 // Gestionnaires d'événements - Actions sur carnets
-const handleNotebookClick = (notebook: Notebook): void => {
-  // Navigation vers l'éditeur de carnet (à implémenter dans US03)
-  message.info(`Ouverture du carnet "${notebook.title}" (éditeur à venir dans US03)`)
-  // router.push(`/notebooks/${notebook.id}/edit`)
+const handleNotebookClick = async (notebook: Notebook): Promise<void> => {
+  try {
+    // Récupérer les pages du carnet
+    const pages = await fetchNotebookPages(notebook.id)
+
+    if (pages.length === 0) {
+      message.warning(`Le carnet "${notebook.title}" n'a pas de pages. Veuillez en créer une.`)
+      return
+    }
+
+    // Naviguer vers le PageEditor avec la première page
+    const firstPage = pages[0]
+    await router.push(`/notebooks/${notebook.id}/edit/${firstPage.id}`)
+    message.success(`Ouverture du carnet "${notebook.title}"`)
+  } catch (error) {
+    console.error('Error opening notebook:', error)
+    message.error('Erreur lors de l\'ouverture du carnet')
+  }
 }
 
 const handleCreateNotebook = (): void => {

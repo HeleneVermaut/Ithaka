@@ -150,87 +150,29 @@
         />
       </main>
 
-      <!-- Right Sidebar (Properties) -->
-      <aside class="editor-sidebar-right">
-        <n-text strong class="sidebar-title">Propriétés</n-text>
-        <div v-if="editorStore.selectedElement" class="properties-panel">
-          <div class="property-group">
-            <n-text depth="3">Position</n-text>
-            <n-space vertical>
-              <n-input-number
-                v-model:value="selectedProps.x"
-                placeholder="X (mm)"
-                size="small"
-                @blur="updateSelectedElement('x')"
-              >
-                <template #prefix>X:</template>
-              </n-input-number>
-              <n-input-number
-                v-model:value="selectedProps.y"
-                placeholder="Y (mm)"
-                size="small"
-                @blur="updateSelectedElement('y')"
-              >
-                <template #prefix>Y:</template>
-              </n-input-number>
-            </n-space>
-          </div>
-
-          <n-divider />
-
-          <div class="property-group">
-            <n-text depth="3">Dimensions</n-text>
-            <n-space vertical>
-              <n-input-number
-                v-model:value="selectedProps.width"
-                placeholder="Largeur (mm)"
-                size="small"
-                @blur="updateSelectedElement('width')"
-              >
-                <template #prefix>L:</template>
-              </n-input-number>
-              <n-input-number
-                v-model:value="selectedProps.height"
-                placeholder="Hauteur (mm)"
-                size="small"
-                @blur="updateSelectedElement('height')"
-              >
-                <template #prefix>H:</template>
-              </n-input-number>
-            </n-space>
-          </div>
-
-          <n-divider />
-
-          <div class="property-group">
-            <n-text depth="3">Rotation</n-text>
-            <n-slider
-              v-model:value="selectedProps.rotation"
-              :min="0"
-              :max="360"
-              :step="1"
-              @update:value="updateSelectedElement('rotation')"
-            />
-            <n-text depth="3" class="mt-2">{{ selectedProps.rotation }}°</n-text>
-          </div>
-
-          <n-divider />
-
-          <div class="property-group">
-            <n-button
-              type="error"
-              size="small"
-              block
-              @click="deleteSelectedElement"
-            >
-              Supprimer l'élément
-            </n-button>
-          </div>
-        </div>
-        <div v-else class="no-selection">
-          <n-text depth="3">Aucun élément sélectionné</n-text>
-        </div>
+      <!-- Right Sidebar (Text Tools and Library) -->
+      <aside v-if="showRightSidebar" class="editor-sidebar-right-new">
+        <EditorSidebar
+          :selected-canvas-element="selectedCanvasElement"
+          @close="showRightSidebar = false"
+          @text-added="handleTextAddedFromSidebar"
+          @text-updated="handleTextUpdatedFromSidebar"
+        />
       </aside>
+
+      <!-- Floating Action Button to toggle sidebar -->
+      <button
+        v-if="!showRightSidebar"
+        class="fab-toggle-sidebar"
+        @click="showRightSidebar = true"
+        title="Ouvrir les outils de texte"
+      >
+        <n-icon size="24">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </n-icon>
+      </button>
     </div>
 
     <!-- Delete Confirmation Modal -->
@@ -262,15 +204,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fabric } from 'fabric'
 import DeleteConfirmModal from '@/components/editor/DeleteConfirmModal.vue'
+import EditorSidebar from '@/components/editor/EditorSidebar.vue'
 import {
   NButton,
   NDivider,
   NSelect,
   NText,
-  NSpace,
-  NInputNumber,
-  NSlider,
   NSpin,
+  NIcon,
   useMessage
 } from 'naive-ui'
 import {
@@ -289,6 +230,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useAutoSave } from '@/composables/useAutoSave'
 import EditorCanvas from '@/components/editor/EditorCanvas.vue'
 import type { SerializedElement } from '@/services/fabricService'
+import type { Font } from '@/services/fontService'
 
 // ========================================
 // COMPOSABLES & STORES
@@ -324,6 +266,12 @@ const showDeleteModal = ref<boolean>(false)
 /** Online/offline status */
 const isOnline = ref<boolean>(navigator.onLine)
 
+/** État d'affichage de la sidebar droite (Text Tools & Library) */
+const showRightSidebar = ref<boolean>(true)
+
+/** Élément canvas sélectionné pour édition dans le TextPanel */
+const selectedCanvasElement = ref<{ text: string; fontFamily: string; fontSize: number; color: string } | null>(null)
+
 /** Options de zoom disponibles */
 const zoomOptions = [
   { label: '50%', value: 0.5 },
@@ -333,15 +281,6 @@ const zoomOptions = [
   { label: '150%', value: 1.5 },
   { label: '200%', value: 2 }
 ]
-
-/** Propriétés de l'élément sélectionné */
-const selectedProps = ref({
-  x: 0,
-  y: 0,
-  width: 0,
-  height: 0,
-  rotation: 0
-})
 
 // ========================================
 // KEYBOARD SHORTCUTS
@@ -413,15 +352,6 @@ function handleElementSelected(elementId: string): void {
   if (element) {
     const serialized = fabricService.serializeElement(element as any)
     editorStore.selectElement(serialized)
-
-    // Update properties panel
-    selectedProps.value = {
-      x: serialized.x,
-      y: serialized.y,
-      width: serialized.width,
-      height: serialized.height,
-      rotation: serialized.rotation
-    }
   }
 }
 
@@ -544,52 +474,6 @@ function handleZoomChange(value: number): void {
 }
 
 /**
- * Update selected element property
- */
-function updateSelectedElement(property: keyof typeof selectedProps.value): void {
-  if (!editorStore.selectedElement || !editorStore.canvas) return
-
-  const updated = { ...editorStore.selectedElement }
-
-  switch (property) {
-    case 'x':
-      updated.x = selectedProps.value.x
-      break
-    case 'y':
-      updated.y = selectedProps.value.y
-      break
-    case 'width':
-      updated.width = selectedProps.value.width
-      break
-    case 'height':
-      updated.height = selectedProps.value.height
-      break
-    case 'rotation':
-      updated.rotation = selectedProps.value.rotation
-      break
-  }
-
-  fabricService.updateCanvasObject(editorStore.canvas, updated.id, updated)
-  editorStore.updateSelectedElement(updated)
-}
-
-/**
- * Delete selected element
- */
-function deleteSelectedElement(): void {
-  if (!editorStore.selectedElement || !editorStore.canvas) return
-
-  fabricService.removeCanvasObject(editorStore.canvas, editorStore.selectedElement.id)
-  editorStore.selectElement(null)
-
-  // Push to history
-  const currentState = fabricService.serializeCanvasElements(editorStore.canvas)
-  editorStore.pushHistory(currentState)
-
-  message.success('Élément supprimé')
-}
-
-/**
  * Handler pour la confirmation de suppression (via modal)
  */
 async function handleDeleteConfirmed(): Promise<void> {
@@ -617,15 +501,6 @@ function selectLayerFromList(layerId: string): void {
 
     const serialized = fabricService.serializeElement(obj)
     editorStore.selectElement(serialized)
-
-    // Update properties panel
-    selectedProps.value = {
-      x: serialized.x,
-      y: serialized.y,
-      width: serialized.width,
-      height: serialized.height,
-      rotation: serialized.rotation
-    }
   }
 }
 
@@ -642,6 +517,102 @@ function getLayerType(type: string | undefined): string {
   }
 
   return typeMap[type || ''] || 'Élément'
+}
+
+/**
+ * Handle text added from EditorSidebar
+ * Creates a text element on the canvas with the provided parameters
+ */
+function handleTextAddedFromSidebar(params: {
+  text: string
+  fontSize: number
+  color: string
+  fontFamily: string
+  fontCategory: Font['category']
+  styles: { isBold: boolean; isItalic: boolean; isUnderline: boolean }
+}): void {
+  try {
+    // Add text element to canvas using editor store
+    const element = editorStore.addTextElement({
+      text: params.text,
+      fontSize: params.fontSize,
+      color: params.color,
+      fontFamily: params.fontFamily,
+      fontCategory: params.fontCategory,
+      styles: params.styles
+    })
+
+    if (element) {
+      // Add to pages store for persistence
+      pagesStore.addElement(element as any)
+
+      // Trigger auto-save
+      scheduleAutoSave()
+
+      message.success('Texte ajouté au canvas')
+      console.log(`Text element added from sidebar: ${element.id}`)
+    } else {
+      message.error('Erreur lors de l\'ajout du texte')
+    }
+  } catch (error) {
+    console.error('Failed to add text from sidebar:', error)
+    message.error('Erreur lors de l\'ajout du texte')
+  }
+}
+
+/**
+ * Handle text updated from EditorSidebar
+ * Updates the currently selected text element on the canvas
+ */
+function handleTextUpdatedFromSidebar(
+  text: string,
+  fontSize: number,
+  color: string
+): void {
+  if (!editorStore.selectedElement || !editorStore.canvas) {
+    message.warning('Aucun élément sélectionné')
+    return
+  }
+
+  try {
+    // Update the element on canvas with proper structure
+    const updated: SerializedElement = {
+      ...editorStore.selectedElement,
+      content: {
+        ...editorStore.selectedElement.content,
+        text
+      },
+      style: {
+        ...editorStore.selectedElement.style,
+        fontSize,
+        fill: color
+      }
+    }
+
+    fabricService.updateCanvasObject(
+      editorStore.canvas,
+      editorStore.selectedElement.id,
+      updated
+    )
+
+    // Update in pages store with proper structure
+    pagesStore.updateElement(editorStore.selectedElement.id, {
+      content: { text },
+      style: { fontSize, fill: color }
+    })
+
+    // Update editor store selection
+    editorStore.updateSelectedElement(updated)
+
+    // Trigger auto-save
+    scheduleAutoSave()
+
+    message.success('Texte modifié avec succès')
+    console.log(`Text element updated from sidebar: ${editorStore.selectedElement.id}`)
+  } catch (error) {
+    console.error('Failed to update text from sidebar:', error)
+    message.error('Erreur lors de la modification du texte')
+  }
 }
 
 // ========================================
@@ -719,11 +690,8 @@ function handleKeyDown(event: KeyboardEvent): void {
     handleRedo()
   }
 
-  // Delete key: Remove selected element
-  if (event.key === 'Delete' && editorStore.selectedElement) {
-    event.preventDefault()
-    deleteSelectedElement()
-  }
+  // Delete key: Remove selected element (now handled by EditorSidebar and useKeyboardShortcuts)
+  // The delete functionality is integrated into the EditorSidebar component
 }
 
 // ========================================
@@ -804,6 +772,27 @@ watch(
   () => editorStore.zoom,
   (newZoom) => {
     zoomLevel.value = newZoom
+  }
+)
+
+/**
+ * Watch for selected element changes and update sidebar
+ * When a text element is selected, populate the TextPanel in edit mode
+ */
+watch(
+  () => editorStore.selectedElement,
+  (newElement) => {
+    if (newElement && newElement.type === 'textbox') {
+      // Extract text properties from content and style for TextPanel
+      selectedCanvasElement.value = {
+        text: (newElement.content?.text as string) || '',
+        fontFamily: (newElement.style?.fontFamily as string) || 'Open Sans',
+        fontSize: (newElement.style?.fontSize as number) || 16,
+        color: (newElement.style?.fill as string) || '#000000'
+      }
+    } else {
+      selectedCanvasElement.value = null
+    }
   }
 )
 </script>
@@ -919,6 +908,28 @@ watch(
   border-right: none;
 }
 
+.editor-sidebar-right-new {
+  width: 400px;
+  max-width: 30vw;
+  background-color: white;
+  border-left: 1px solid #e5e7eb;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 .sidebar-title {
   display: block;
   margin-bottom: 12px;
@@ -1018,6 +1029,50 @@ watch(
 }
 
 /* ========================================
+   FLOATING ACTION BUTTON (FAB)
+   ======================================== */
+
+.fab-toggle-sidebar {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4), 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.fab-toggle-sidebar:hover {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5), 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.fab-toggle-sidebar:active {
+  transform: scale(0.95);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
    RESPONSIVE
    ======================================== */
 
@@ -1025,6 +1080,11 @@ watch(
   .editor-sidebar-left,
   .editor-sidebar-right {
     width: 240px;
+  }
+
+  .editor-sidebar-right-new {
+    width: 350px;
+    max-width: 40vw;
   }
 }
 
@@ -1037,8 +1097,25 @@ watch(
     width: 200px;
   }
 
+  .editor-sidebar-right-new {
+    width: 100%;
+    max-width: 100vw;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+  }
+
   .toolbar-group:nth-child(n + 3) {
     display: none;
+  }
+
+  .fab-toggle-sidebar {
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
   }
 }
 
@@ -1053,6 +1130,13 @@ watch(
 
   .editor-canvas-area {
     padding: 12px;
+  }
+
+  .fab-toggle-sidebar {
+    bottom: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
   }
 }
 

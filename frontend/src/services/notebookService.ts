@@ -142,8 +142,8 @@ export async function createNotebook(data: CreateNotebookDto): Promise<Notebook>
   try {
     const response = await apiClient.post('/notebooks', data)
 
-    // Le backend retourne : { success: true, message: '...', data: { notebook: {...} } }
-    return response.data.data.notebook
+    // Le backend retourne : { success: true, data: {...}, message: '...' }
+    return response.data.data
   } catch (error: unknown) {
     throw new Error(handleApiError(error, 'Erreur lors de la création du carnet'))
   }
@@ -320,8 +320,8 @@ export async function updateNotebook(id: string, data: UpdateNotebookDto): Promi
   try {
     const response = await apiClient.put(`/notebooks/${id}`, data)
 
-    // Le backend retourne : { success: true, message: '...', data: { notebook: {...} } }
-    return response.data.data.notebook
+    // Le backend retourne : { success: true, data: {...}, message: '...' }
+    return response.data.data
   } catch (error: unknown) {
     throw new Error(handleApiError(error, 'Erreur lors de la mise à jour du carnet'))
   }
@@ -364,8 +364,8 @@ export async function duplicateNotebook(id: string): Promise<Notebook> {
   try {
     const response = await apiClient.post(`/notebooks/${id}/duplicate`)
 
-    // Le backend retourne : { success: true, message: '...', data: { notebook: {...} } }
-    return response.data.data.notebook
+    // Le backend retourne : { success: true, data: {...}, message: '...' }
+    return response.data.data
   } catch (error: unknown) {
     throw new Error(handleApiError(error, 'Erreur lors de la duplication du carnet'))
   }
@@ -406,8 +406,8 @@ export async function archiveNotebook(id: string): Promise<Notebook> {
   try {
     const response = await apiClient.put(`/notebooks/${id}/archive`)
 
-    // Le backend retourne : { success: true, message: '...', data: { notebook: {...} } }
-    return response.data.data.notebook
+    // Le backend retourne : { success: true, data: {...}, message: '...' }
+    return response.data.data
   } catch (error: unknown) {
     throw new Error(handleApiError(error, "Erreur lors de l'archivage du carnet"))
   }
@@ -446,8 +446,8 @@ export async function restoreNotebook(id: string): Promise<Notebook> {
   try {
     const response = await apiClient.put(`/notebooks/${id}/restore`)
 
-    // Le backend retourne : { success: true, message: '...', data: { notebook: {...} } }
-    return response.data.data.notebook
+    // Le backend retourne : { success: true, data: {...}, message: '...' }
+    return response.data.data
   } catch (error: unknown) {
     throw new Error(handleApiError(error, 'Erreur lors de la restauration du carnet'))
   }

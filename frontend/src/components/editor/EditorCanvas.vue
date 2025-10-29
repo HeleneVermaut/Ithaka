@@ -1,8 +1,10 @@
 <template>
   <div
     class="editor-canvas-container"
+    :class="{ 'is-drag-over': isDraggingOver }"
     :style="containerStyle"
     @dragover.prevent="onCanvasDragOver"
+    @dragleave="onCanvasDragLeave"
     @drop="onCanvasDrop"
   >
     <!-- Grid Toggle Button -->
@@ -115,6 +117,9 @@ const GRID_SIZE_MM = 10
 
 /** Store grid line objects for later removal */
 let gridLines: fabric.Line[] = []
+
+/** Track if user is dragging over canvas for visual feedback */
+const isDraggingOver = ref<boolean>(false)
 
 // ========================================
 // COMPUTED PROPERTIES
@@ -294,38 +299,76 @@ function onCanvasMouseDown(): void {
 
 /**
  * Handle dragover event on canvas to allow dropping
+ * Sets visual feedback to show user can drop here
  */
 function onCanvasDragOver(event: DragEvent): void {
   event.preventDefault()
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = 'copy'
   }
+
+  // Enable drag-over visual feedback
+  if (!isDraggingOver.value) {
+    isDraggingOver.value = true
+    if (DEBUG) debugLog(DebugCategory.CANVAS, 'Drag entered canvas drop zone')
+  }
+}
+
+/**
+ * Handle dragleave event on canvas to remove visual feedback
+ */
+function onCanvasDragLeave(event: DragEvent): void {
+  event.preventDefault()
+
+  // Only clear if actually leaving canvas (not entering child element)
+  const relatedTarget = event.relatedTarget as HTMLElement
+  const currentTarget = event.currentTarget as HTMLElement
+
+  if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+    isDraggingOver.value = false
+    if (DEBUG) debugLog(DebugCategory.CANVAS, 'Drag left canvas drop zone')
+  }
 }
 
 /**
  * Handle drop event on canvas to add text from library
+ * Creates new Fabric.js Textbox at drop coordinates with formatting preserved
  */
 async function onCanvasDrop(event: DragEvent): Promise<void> {
   event.preventDefault()
+  isDraggingOver.value = false // Clear drag-over state
 
-  if (!fabricCanvas) return
+  if (!fabricCanvas) {
+    debugError(DebugCategory.CANVAS, 'Cannot drop: canvas is null', new Error('Canvas is null'))
+    return
+  }
 
   // Try to get JSON data (for saved texts from library)
   const jsonData = event.dataTransfer?.getData('application/json')
-  if (!jsonData) return
+  if (!jsonData) {
+    if (DEBUG) debugLog(DebugCategory.CANVAS, 'No JSON data in drop event')
+    return
+  }
 
   try {
     const savedText = JSON.parse(jsonData)
 
     // Get drop coordinates relative to canvas
-    const canvasRect = (event.target as HTMLElement).getBoundingClientRect()
-    const x = event.clientX - canvasRect.left
-    const y = event.clientY - canvasRect.top
+    const canvasRect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const dropX = event.clientX - canvasRect.left
+    const dropY = event.clientY - canvasRect.top
+
+    if (DEBUG) {
+      debugLog(DebugCategory.CANVAS, 'Text dropped on canvas', {
+        label: savedText.label,
+        coordinates: { x: dropX, y: dropY }
+      })
+    }
 
     // Create fabric text object from saved text
     const fabricText = new fabric.Textbox(savedText.content.text, {
-      left: x,
-      top: y,
+      left: dropX,
+      top: dropY,
       fontFamily: savedText.content.fontFamily,
       fontSize: savedText.content.fontSize,
       fill: savedText.content.fill || '#000000',
@@ -337,20 +380,43 @@ async function onCanvasDrop(event: DragEvent): Promise<void> {
       width: 300 // Default width for textbox
     })
 
-    // Add data for element tracking
-    if (!fabricText.data) {
-      fabricText.data = {}
+    // Add metadata for element tracking and traceability
+    const elementId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    fabricText.data = {
+      elementId,
+      id: elementId, // Keep for backward compatibility
+      sourceLibraryId: savedText.id,
+      sourceLabel: savedText.label,
+      sourceType: savedText.type,
+      createdAt: new Date().toISOString()
     }
-    fabricText.data.elementId = `text-${Date.now()}`
 
     // Add to canvas
     fabricCanvas.add(fabricText)
     fabricCanvas.setActiveObject(fabricText)
-    fabricCanvas.renderAll()
+    fabricCanvas.requestRenderAll()
 
-    console.log('Text dropped and added to canvas:', fabricText.data.elementId)
+    if (DEBUG) {
+      debugLog(DebugCategory.CANVAS, 'Textbox added to canvas from library', {
+        elementId,
+        sourceLabel: savedText.label,
+        position: { x: dropX, y: dropY }
+      })
+    }
+
+    // Show success message
+    window.$message?.success(`"${savedText.label}" ajouté au canvas`)
+
+    // Emit element modified event for auto-save
+    emit('elementModified', elementId, {
+      left: dropX,
+      top: dropY,
+      width: 300,
+      height: fabricText.height || 50
+    })
   } catch (error) {
-    console.error('Failed to parse dropped text:', error)
+    debugError(DebugCategory.CANVAS, 'Failed to parse dropped text', error)
+    window.$message?.error('Erreur lors de l\'ajout du texte')
   }
 }
 
@@ -572,12 +638,47 @@ onUnmounted(() => {
   justify-content: center;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
 }
 
 .editor-canvas-container:hover {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Visual feedback when dragging text over canvas */
+.editor-canvas-container.is-drag-over {
+  background-color: rgba(24, 160, 88, 0.05);
+  border-color: #18a058 !important;
+  box-shadow: 0 0 0 3px rgba(24, 160, 88, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.editor-canvas-container.is-drag-over::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(24, 160, 88, 0.05),
+    rgba(24, 160, 88, 0.05) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+  pointer-events: none;
+  z-index: 1;
+  animation: drop-zone-pulse 2s ease-in-out infinite;
+}
+
+@keyframes drop-zone-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Canvas Controls (Grid Toggle, etc.) */
