@@ -726,27 +726,43 @@ onMounted(async () => {
     message.warning('Mode hors ligne - Vos modifications seront sauvegardées localement')
   })
 
-  // TODO: Fetch page data from API
-  // const page = await pageService.getPage(notebookId.value, pageId.value)
-  // pageFormat.value = page.format || 'A4'
-  // pageOrientation.value = page.orientation || 'portrait'
-  // pageElements.value = page.elements || []
+  try {
+    // Load page data from store
+    await pagesStore.loadPage(pageId.value)
 
-  // Check for unsaved data on mount
-  const unsavedData = autoSave.loadFromLocalStorage(pageId.value)
-  if (unsavedData && unsavedData.length > 0) {
-    message.warning('Des modifications locales ont été trouvées', {
-      closable: true,
-      duration: 5000
-    })
+    // Get the loaded page and its elements
+    const currentPageData = pagesStore.currentPage
+    if (currentPageData) {
+      pageFormat.value = (currentPageData as any).format || 'A4'
+      pageOrientation.value = (currentPageData as any).orientation || 'portrait'
+    } else {
+      // Fallback to defaults if page data is missing
+      pageFormat.value = 'A4'
+      pageOrientation.value = 'portrait'
+    }
+
+    // Load page elements from store
+    const elements = pagesStore.elementsByZIndex(pageId.value)
+    pageElements.value = elements
+
+    // Check for unsaved data on mount
+    const unsavedData = autoSave.loadFromLocalStorage(pageId.value)
+    if (unsavedData && unsavedData.length > 0) {
+      message.warning('Des modifications locales ont été trouvées', {
+        closable: true,
+        duration: 5000
+      })
+    }
+
+    console.log(`PageEditor loaded for notebook ${notebookId.value}, page ${pageId.value}`)
+  } catch (error) {
+    console.error('Error loading page:', error)
+    message.error('Erreur lors du chargement de la page')
+    // Still allow editing with empty page as fallback
+    pageFormat.value = 'A4'
+    pageOrientation.value = 'portrait'
+    pageElements.value = []
   }
-
-  // For now, initialize with empty page
-  pageFormat.value = 'A4'
-  pageOrientation.value = 'portrait'
-  pageElements.value = []
-
-  console.log(`PageEditor loaded for notebook ${notebookId.value}, page ${pageId.value}`)
 })
 
 /**
