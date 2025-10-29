@@ -20,8 +20,26 @@
         @click="activeTab = tab"
         :title="tabLabels[tab]"
       >
-        <component :is="tabIcons[tab]" class="icon" />
+        <!-- Special handling for text-library tab with badge -->
+        <template v-if="tab === 'text-library'">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+        </template>
+        <!-- Default icons for other tabs -->
+        <template v-else>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <text v-if="tab === 'add-text'">+</text>
+            <text v-else-if="tab === 'edit'">✎</text>
+            <text v-else-if="tab === 'layers'">⋮</text>
+          </svg>
+        </template>
         <span class="label">{{ tabLabels[tab] }}</span>
+        <!-- Badge for library tab showing count -->
+        <span v-if="tab === 'text-library' && savedTextsCount > 0" class="badge">
+          {{ savedTextsCount > 99 ? '99+' : savedTextsCount }}
+        </span>
       </button>
     </div>
 
@@ -56,57 +74,9 @@
         </div>
       </div>
 
-      <!-- Library Tab -->
-      <div v-if="activeTab === 'library'" class="tab-pane">
-        <div class="library-panel">
-          <div v-if="savedStyles.length > 0" class="styles-list">
-            <div class="list-header">
-              <h4>Styles sauvegardés ({{ savedStyles.length }})</h4>
-            </div>
-
-            <div
-              v-for="(style, index) in savedStyles"
-              :key="index"
-              :class="['style-item', { 'is-selected': selectedStyleIndex === index }]"
-              @click="selectedStyleIndex = index"
-            >
-              <div class="style-preview" :style="getStylePreview(style)">
-                Aa
-              </div>
-              <div class="style-info">
-                <div class="style-font">{{ style.fontFamily }}</div>
-                <div class="style-size">{{ style.fontSize }}px</div>
-              </div>
-              <div class="style-color" :style="{ backgroundColor: style.color }"></div>
-              <button
-                class="delete-button"
-                @click.stop="deleteStyle(index)"
-                title="Supprimer ce style"
-              >
-                ×
-              </button>
-            </div>
-
-            <!-- Use selected style -->
-            <button
-              v-if="selectedStyleIndex !== null"
-              class="btn btn-primary use-style"
-              @click="useSelectedStyle"
-            >
-              Utiliser ce style
-            </button>
-          </div>
-
-          <div v-else class="empty-state">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            <p>Aucun style sauvegardé</p>
-            <small>Créez des textes et sauvegardez leurs styles</small>
-          </div>
-        </div>
+      <!-- Text Library Tab -->
+      <div v-if="activeTab === 'text-library'" class="tab-pane">
+        <TextLibrary @use-text="handleUseTextFromLibrary" />
       </div>
 
       <!-- Layers Tab (Z-Index Controls) -->
@@ -138,9 +108,12 @@ import { useRoute } from 'vue-router'
 import TextPanel from './TextPanel.vue'
 import ZIndexControls from './ZIndexControls.vue'
 import DeleteConfirmModal from './DeleteConfirmModal.vue'
+import TextLibrary from '@/components/library/TextLibrary.vue'
 import { useEditorStore } from '@/stores/editor'
 import { usePagesStore } from '@/stores/pages'
+import { useAuthStore } from '@/stores/auth'
 import type { Font } from '@/services/fontService'
+import type { ISavedText } from '@/types/models'
 
 /**
  * Props du composant
@@ -193,12 +166,13 @@ const emit = defineEmits<Emits>()
 const route = useRoute()
 const editorStore = useEditorStore()
 const pagesStore = usePagesStore()
+const authStore = useAuthStore()
 
 /**
  * Onglets disponibles
  */
-type TabType = 'add-text' | 'edit' | 'library' | 'layers'
-const tabs: TabType[] = ['add-text', 'edit', 'library', 'layers']
+type TabType = 'add-text' | 'edit' | 'text-library' | 'layers'
+const tabs: TabType[] = ['add-text', 'edit', 'text-library', 'layers']
 
 /**
  * Onglet actif
@@ -217,10 +191,6 @@ const selectedElement = ref<{ text: string; fontFamily: string; fontSize: number
  */
 const savedStyles = ref<SavedStyle[]>(loadSavedStyles())
 
-/**
- * Index du style sélectionné dans la bibliothèque
- */
-const selectedStyleIndex = ref<number | null>(null)
 
 /**
  * Nombre total d'éléments sur la page actuelle
@@ -241,7 +211,7 @@ const showDeleteModal = ref<boolean>(false)
 const tabLabels: Record<TabType, string> = {
   'add-text': 'Ajouter du texte',
   'edit': 'Modifier le texte',
-  'library': 'Bibliothèque de styles',
+  'text-library': 'Bibliothèque',
   'layers': 'Calques'
 }
 
@@ -251,9 +221,16 @@ const tabLabels: Record<TabType, string> = {
 const tabIcons: Record<TabType, string> = {
   'add-text': 'AddTextIcon',
   'edit': 'EditIcon',
-  'library': 'LibraryIcon',
+  'text-library': 'BookOutline',
   'layers': 'LayersIcon'
 }
+
+/**
+ * Nombre de textes sauvegardés
+ */
+const savedTextsCount = computed<number>(() => {
+  return authStore.savedTexts.length
+})
 
 /**
  * Charge les styles sauvegardés depuis localStorage
@@ -315,43 +292,6 @@ function handleSaveToLibrary(style: SavedStyle): void {
   saveSylesToLocalStorage()
 }
 
-/**
- * Supprime un style de la bibliothèque
- */
-function deleteStyle(index: number): void {
-  savedStyles.value.splice(index, 1)
-  saveSylesToLocalStorage()
-  if (selectedStyleIndex.value === index) {
-    selectedStyleIndex.value = null
-  }
-}
-
-/**
- * Utilise le style sélectionné
- *
- * TODO: Implémenter la propagation du style sélectionné vers TextPanel
- */
-function useSelectedStyle(): void {
-  if (selectedStyleIndex.value !== null) {
-    // const selectedStyle = savedStyles.value[selectedStyleIndex.value]
-    activeTab.value = 'add-text'
-    // Le TextPanel se mettra à jour avec les valeurs du style
-  }
-}
-
-/**
- * Obtient le style de prévisualisation pour un style sauvegardé
- */
-function getStylePreview(savedStyle: SavedStyle): Record<string, string> {
-  return {
-    fontFamily: savedStyle.fontFamily,
-    fontSize: `${Math.min(savedStyle.fontSize, 18)}px`,
-    color: savedStyle.color,
-    fontWeight: savedStyle.isBold ? 'bold' : 'normal',
-    fontStyle: savedStyle.isItalic ? 'italic' : 'normal',
-    textDecoration: savedStyle.isUnderline ? 'underline' : 'none'
-  }
-}
 
 /**
  * Handler pour demande de suppression d'élément
@@ -366,6 +306,28 @@ function handleDeleteRequested(): void {
 async function handleDeleteConfirmed(): Promise<void> {
   await editorStore.deleteElement()
   showDeleteModal.value = false
+}
+
+/**
+ * Handler pour utiliser un texte de la bibliothèque
+ * Ajoute le texte au canvas au centre
+ */
+function handleUseTextFromLibrary(savedText: ISavedText): void {
+  // Emit event to parent to add text to canvas
+  emit('text-added', {
+    text: savedText.content.text,
+    fontSize: savedText.content.fontSize,
+    color: savedText.content.fill || '#000000',
+    fontFamily: savedText.content.fontFamily,
+    fontCategory: 'sans-serif' as const,
+    styles: {
+      isBold: savedText.content.fontWeight === 'bold',
+      isItalic: savedText.content.fontStyle === 'italic',
+      isUnderline: savedText.content.underline || false
+    }
+  })
+
+  window.$message?.success('Texte ajouté au canvas')
 }
 </script>
 
@@ -633,6 +595,22 @@ async function handleDeleteConfirmed(): Promise<void> {
   &:hover {
     color: #d32f2f;
   }
+}
+
+/* Badge for tab counts */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff4757;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+  min-width: 18px;
+  height: 18px;
 }
 
 .use-style {

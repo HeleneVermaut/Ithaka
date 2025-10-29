@@ -20,6 +20,7 @@ import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
 import { useAuthStore } from '@/stores/auth'
+import { DEBUG, showDebugIndicator } from './utils/debug'
 
 // Styles globaux de l'application
 import './assets/main.css'
@@ -86,6 +87,18 @@ const bootstrapApp = async (): Promise<void> => {
   app.mount('#app')
 
   console.log('Application Ithaka mounted successfully')
+
+  // ========================================
+  // 5. ENABLE DEBUG MODE IF REQUESTED
+  // ========================================
+
+  /**
+   * Show debug indicator if ?debug=true in URL
+   * This helps developers understand debug mode is active
+   */
+  if (DEBUG) {
+    showDebugIndicator()
+  }
 }
 
 // ========================================

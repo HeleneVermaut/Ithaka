@@ -28,8 +28,8 @@ npm install
 # Copier le fichier d'environnement
 cp .env.example .env
 
-# Éditer .env pour configurer l'URL de l'API backend
-# VITE_API_BASE_URL=http://localhost:8000
+# Éditer .env pour configurer l'URL de l'API backend (must include /api prefix)
+# VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
 ## Scripts Disponibles
@@ -156,10 +156,10 @@ frontend/
 Les variables d'environnement sont définies dans le fichier `.env` :
 
 ```env
-VITE_API_BASE_URL=http://localhost:8000  # URL de l'API backend
-VITE_APP_ENV=development                  # Environnement (development|production|test)
-VITE_APP_TITLE=Ithaka - Carnets de Voyage # Titre de l'application
-VITE_DEBUG_MODE=true                      # Activer les logs de debug
+VITE_API_BASE_URL=http://localhost:3000/api  # URL de l'API backend (must include /api prefix)
+VITE_APP_ENV=development                      # Environnement (development|production|test)
+VITE_APP_TITLE=Ithaka - Carnets de Voyage     # Titre de l'application
+VITE_DEBUG_MODE=true                          # Activer les logs de debug
 ```
 
 **Important** : Seules les variables préfixées par `VITE_` sont exposées au code client.

@@ -17,7 +17,7 @@
  * @module services/tokenService
  */
 
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -27,6 +27,7 @@ import {
   DecodedJWT,
 } from '../utils/jwt';
 import { logger } from '../utils/logger';
+import { AuditLogger } from '../utils/auditLogger';
 
 /**
  * Cookie configuration for JWT tokens
@@ -43,17 +44,18 @@ interface CookieOptions {
 /**
  * Get cookie options based on environment
  * In production, enforce HTTPS (secure: true)
- * In development, allow HTTP for local testing
+ * In development, allow HTTP for local testing unless FORCE_HTTPS is set
  *
  * @param {number} maxAge - Maximum age of cookie in milliseconds
  * @returns {CookieOptions} Cookie configuration object
  */
 const getCookieOptions = (maxAge: number): CookieOptions => {
   const isProduction = process.env['NODE_ENV'] === 'production';
+  const forceHttps = process.env['FORCE_HTTPS'] === 'true';
 
   return {
     httpOnly: true, // Prevent JavaScript access (XSS protection)
-    secure: isProduction, // HTTPS only in production
+    secure: isProduction || forceHttps, // HTTPS only in production or when forced
     sameSite: 'strict', // Prevent CSRF attacks
     maxAge, // Cookie expiration time
     path: '/', // Cookie available for entire domain
@@ -157,23 +159,24 @@ export const clearAuthTokens = (res: Response): void => {
  * Verify access token validity
  *
  * Wrapper function that verifies an access token and returns the decoded payload.
- * Throws an error if the token is invalid or expired.
+ * Throws an error if the token is invalid, expired, or revoked.
  *
+ * @async
  * @param {string} token - Access token to verify
- * @returns {DecodedJWT} Decoded token payload with user information
- * @throws {Error} If token is invalid, expired, or malformed
+ * @returns {Promise<DecodedJWT>} Decoded token payload with user information
+ * @throws {Error} If token is invalid, expired, malformed, or revoked
  *
  * @example
  * try {
- *   const decoded = verifyToken(req.cookies.accessToken);
+ *   const decoded = await verifyToken(req.cookies.accessToken);
  *   console.log('User ID:', decoded.userId);
  * } catch (error) {
- *   // Token is invalid, require login
+ *   // Token is invalid or revoked, require login
  * }
  */
-export const verifyToken = (token: string): DecodedJWT => {
+export const verifyToken = async (token: string): Promise<DecodedJWT> => {
   try {
-    return verifyAccessToken(token);
+    return await verifyAccessToken(token);
   } catch (error) {
     logger.warn('Access token verification failed', { error: (error as Error).message });
     throw error;
@@ -186,25 +189,26 @@ export const verifyToken = (token: string): DecodedJWT => {
  * Wrapper function that verifies a refresh token. Used when generating
  * a new access token after the old one expires.
  *
+ * @async
  * @param {string} token - Refresh token to verify
- * @returns {DecodedJWT} Decoded token payload
- * @throws {Error} If token is invalid, expired, or malformed
+ * @returns {Promise<DecodedJWT>} Decoded token payload
+ * @throws {Error} If token is invalid, expired, malformed, or revoked
  *
  * @example
  * try {
- *   const decoded = verifyRefresh(req.cookies.refreshToken);
+ *   const decoded = await verifyRefresh(req.cookies.refreshToken);
  *   // Generate new access token
  *   const newAccessToken = generateAccessToken({
  *     userId: decoded.userId,
  *     role: decoded.role
  *   });
  * } catch (error) {
- *   // Refresh token expired, require login
+ *   // Refresh token expired or revoked, require login
  * }
  */
-export const verifyRefresh = (token: string): DecodedJWT => {
+export const verifyRefresh = async (token: string): Promise<DecodedJWT> => {
   try {
-    return verifyRefreshToken(token);
+    return await verifyRefreshToken(token);
   } catch (error) {
     logger.warn('Refresh token verification failed', { error: (error as Error).message });
     throw error;
@@ -235,11 +239,12 @@ export const verifyRefresh = (token: string): DecodedJWT => {
  */
 export const refreshAccessToken = async (
   res: Response,
-  refreshToken: string
+  refreshToken: string,
+  req?: Request
 ): Promise<string> => {
   try {
     // Verify refresh token is valid
-    const decoded = verifyRefreshToken(refreshToken);
+    const decoded = await verifyRefreshToken(refreshToken);
 
     // Generate new access token with same payload
     const newAccessToken = generateAccessToken({
@@ -254,6 +259,13 @@ export const refreshAccessToken = async (
     logger.info('Access token refreshed successfully', {
       userId: decoded.userId,
     });
+
+    // Log token refresh for audit
+    AuditLogger.logTokenRefresh(
+      decoded.userId,
+      req?.ip || 'unknown',
+      req?.headers['user-agent'] || 'unknown'
+    );
 
     return newAccessToken;
   } catch (error) {
@@ -279,13 +291,13 @@ export const refreshAccessToken = async (
  *   console.log('No valid token found');
  * }
  */
-export const extractAndVerifyToken = (cookies: any): DecodedJWT | null => {
+export const extractAndVerifyToken = async (cookies: any): Promise<DecodedJWT | null> => {
   try {
     const token = cookies['accessToken'];
     if (!token) {
       return null;
     }
-    return verifyAccessToken(token);
+    return await verifyAccessToken(token);
   } catch (error) {
     logger.debug('Token extraction/verification failed', { error: (error as Error).message });
     return null;

@@ -45,6 +45,88 @@ const strongPasswordValidator = (value: string, helpers: any) => {
 };
 
 /**
+ * Custom Joi validator for base64-encoded images
+ * Validates:
+ * - Valid base64 encoding
+ * - Valid image MIME type (JPEG, PNG, WebP, GIF)
+ * - File size after decoding
+ *
+ * @param {string} value - Base64-encoded image string
+ * @param {any} helpers - Joi helpers for error messages
+ * @returns {string} Validated base64 string
+ */
+const base64ImageValidator = (value: string, helpers: any) => {
+  if (!value) {
+    return value; // Allow empty/null for optional fields
+  }
+
+  // Check if it's valid base64
+  try {
+    const buffer = Buffer.from(value, 'base64');
+    // Verify it's actually base64 by re-encoding and comparing
+    if (buffer.toString('base64') !== value) {
+      return helpers.error('image.invalidBase64');
+    }
+  } catch (error) {
+    return helpers.error('image.invalidBase64');
+  }
+
+  // Check MIME type from base64 magic bytes
+  const mimeType = getBase64ImageMimeType(value);
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+  if (!mimeType || !allowedMimes.includes(mimeType)) {
+    return helpers.error('image.invalidMimeType');
+  }
+
+  // Check file size (max 375KB after decoding)
+  const buffer = Buffer.from(value, 'base64');
+  if (buffer.length > 375000) {
+    return helpers.error('image.fileTooLarge');
+  }
+
+  return value;
+};
+
+/**
+ * Detect MIME type from base64 string magic bytes
+ *
+ * @private
+ * @param {string} base64String - Base64-encoded data
+ * @returns {string | null} MIME type or null if unknown
+ */
+const getBase64ImageMimeType = (base64String: string): string | null => {
+  try {
+    const buffer = Buffer.from(base64String, 'base64');
+    const signature = buffer.toString('hex', 0, 4);
+
+    // JPEG: FF D8 FF
+    if (signature.substring(0, 6) === 'ffd8ff') {
+      return 'image/jpeg';
+    }
+    // PNG: 89 50 4E 47
+    if (signature === '89504e47') {
+      return 'image/png';
+    }
+    // GIF: 47 49 46 38
+    if (signature.substring(0, 6) === '474946') {
+      return 'image/gif';
+    }
+    // WebP: RIFF ... WEBP (check for WEBP at position 8)
+    if (signature.substring(0, 4) === '52494646') {
+      const webpSignature = buffer.toString('ascii', 8, 12);
+      if (webpSignature === 'WEBP') {
+        return 'image/webp';
+      }
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
  * Joi schema for user registration
  * Validates all required and optional fields for creating a new user
  */
@@ -117,10 +199,12 @@ export const registerSchema = Joi.object({
 
   avatarBase64: Joi.string()
     .optional()
-    .max(500000)
     .allow('')
+    .custom(base64ImageValidator)
     .messages({
-      'string.max': 'Avatar image is too large (max 375KB)',
+      'image.invalidBase64': 'Avatar must be a valid base64-encoded image',
+      'image.invalidMimeType': 'Avatar must be JPEG, PNG, WebP, or GIF format',
+      'image.fileTooLarge': 'Avatar image is too large (max 375KB)',
     }),
 });
 
@@ -194,13 +278,52 @@ export const updateProfileSchema = Joi.object({
 
   avatarBase64: Joi.string()
     .optional()
-    .max(500000)
     .allow('')
+    .custom(base64ImageValidator)
     .messages({
-      'string.max': 'Avatar image is too large (max 375KB)',
+      'image.invalidBase64': 'Avatar must be a valid base64-encoded image',
+      'image.invalidMimeType': 'Avatar must be JPEG, PNG, WebP, or GIF format',
+      'image.fileTooLarge': 'Avatar image is too large (max 375KB)',
     }),
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
+});
+
+/**
+ * Joi schema for checking if email is unique
+ * Validates email format for check-email endpoint
+ */
+export const checkEmailSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .lowercase()
+    .trim()
+    .max(255)
+    .messages({
+      'string.email': 'Please provide a valid email address',
+      'any.required': 'Email is required',
+      'string.max': 'Email must not exceed 255 characters',
+    }),
+});
+
+/**
+ * Joi schema for checking if username/pseudo is unique
+ * Validates username format for check-pseudo endpoint
+ */
+export const checkPseudoSchema = Joi.object({
+  pseudo: Joi.string()
+    .required()
+    .trim()
+    .min(3)
+    .max(50)
+    .alphanum()
+    .messages({
+      'any.required': 'Username is required',
+      'string.min': 'Username must be at least 3 characters',
+      'string.max': 'Username must not exceed 50 characters',
+      'string.alphanum': 'Username must contain only letters and numbers',
+    }),
 });
 
 /**
@@ -1024,6 +1147,8 @@ export default {
   registerSchema,
   loginSchema,
   updateProfileSchema,
+  checkEmailSchema,
+  checkPseudoSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,

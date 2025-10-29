@@ -26,6 +26,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import authService from '@/services/authService'
+import userService from '@/services/userService'
 import type {
   User,
   LoginData,
@@ -33,7 +34,8 @@ import type {
   UpdateProfileData,
   UpdatePasswordData,
   ForgotPasswordData,
-  ResetPasswordData
+  ResetPasswordData,
+  ISavedText
 } from '@/types/models'
 
 /**
@@ -78,6 +80,15 @@ export const useAuthStore = defineStore('auth', () => {
    * un message générique en cas d'erreur réseau
    */
   const error = ref<string | null>(null)
+
+  /**
+   * Textes sauvegardés par l'utilisateur dans la bibliothèque
+   * Array vide par défaut, peuplé lors du login/refresh
+   *
+   * Contient tous les textes pré-formatés (citations, poèmes, etc.)
+   * que l'utilisateur a sauvegardés pour réutilisation
+   */
+  const savedTexts = ref<ISavedText[]>([])
 
   // ========================================
   // GETTERS (État dérivé)
@@ -622,6 +633,201 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * Récupération de tous les textes sauvegardés de l'utilisateur
+   *
+   * Appelle userService.fetchSavedTexts pour récupérer tous les textes
+   * pré-formatés sauvegardés par l'utilisateur.
+   *
+   * Cette méthode est appelée :
+   * - Lors du login pour initialiser la bibliothèque
+   * - Lors du rafraîchissement du token
+   * - Quand l'utilisateur accède à la vue de la bibliothèque
+   *
+   * @throws Error si la récupération échoue (401, 500)
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await authStore.fetchSavedTexts()
+   *   console.log('Textes sauvegardés:', authStore.savedTexts)
+   * } catch (err) {
+   *   console.error('Erreur récupération:', authStore.error)
+   * }
+   * ```
+   */
+  const fetchSavedTexts = async (): Promise<void> => {
+    loading.value = true
+    error.value = null
+
+    try {
+      // Appel API pour récupérer les textes sauvegardés
+      const textsData = await userService.fetchSavedTexts()
+
+      // Mise à jour du state avec les textes
+      savedTexts.value = textsData
+
+      console.log('Saved texts fetched successfully:', savedTexts.value.length)
+    } catch (err: unknown) {
+      // Gestion des erreurs
+      if (err instanceof Error) {
+        error.value = err.message
+      } else {
+        error.value = 'Erreur lors de la récupération des textes sauvegardés'
+      }
+      console.error('Fetch saved texts failed:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Ajout d'un nouveau texte à la bibliothèque
+   *
+   * Appelle userService.saveText pour créer un nouveau texte sauvegardé.
+   * En cas de succès, ajoute le nouveau texte au state.
+   *
+   * @param textData - Données du texte à sauvegarder (label, type, content, etc.)
+   * @throws Error si la création échoue (400 validation, 401 auth, 500 serveur)
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await authStore.addSavedText({
+   *     label: 'Ma citation préférée',
+   *     type: 'citation',
+   *     content: { text: '...', fontFamily: '...', fontSize: 14, fill: '#000' }
+   *   })
+   *   window.$message.success('Texte sauvegardé')
+   * } catch (err) {
+   *   console.error('Erreur sauvegarde:', authStore.error)
+   * }
+   * ```
+   */
+  const addSavedText = async (textData: Omit<ISavedText, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
+    loading.value = true
+    error.value = null
+
+    try {
+      // Appel API pour créer le texte sauvegardé
+      const newText = await userService.saveText(textData)
+
+      // Ajout du nouveau texte au state
+      savedTexts.value.push(newText)
+
+      console.log('Saved text added successfully:', newText.id)
+    } catch (err: unknown) {
+      // Gestion des erreurs
+      if (err instanceof Error) {
+        error.value = err.message
+      } else {
+        error.value = 'Erreur lors de la sauvegarde du texte'
+      }
+      console.error('Add saved text failed:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Mise à jour d'un texte sauvegardé existant
+   *
+   * Appelle userService.updateText pour modifier un texte existant.
+   * En cas de succès, met à jour le texte dans le state.
+   *
+   * @param textId - ID du texte à mettre à jour (UUID)
+   * @param updates - Champs à modifier (label, type, content, etc.)
+   * @throws Error si la mise à jour échoue (404 non trouvé, 401 auth, 500 serveur)
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await authStore.updateSavedText(textId, {
+   *     label: 'Citation modifiée',
+   *     content: { ...updatedContent }
+   *   })
+   *   window.$message.success('Texte mis à jour')
+   * } catch (err) {
+   *   console.error('Erreur mise à jour:', authStore.error)
+   * }
+   * ```
+   */
+  const updateSavedText = async (textId: string, updates: Partial<Omit<ISavedText, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> => {
+    loading.value = true
+    error.value = null
+
+    try {
+      // Appel API pour mettre à jour le texte
+      const updatedText = await userService.updateText(textId, updates)
+
+      // Mise à jour du texte dans le state
+      const index = savedTexts.value.findIndex(t => t.id === textId)
+      if (index !== -1) {
+        savedTexts.value[index] = updatedText
+      }
+
+      console.log('Saved text updated successfully:', textId)
+    } catch (err: unknown) {
+      // Gestion des erreurs
+      if (err instanceof Error) {
+        error.value = err.message
+      } else {
+        error.value = 'Erreur lors de la mise à jour du texte'
+      }
+      console.error('Update saved text failed:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Suppression d'un texte sauvegardé
+   *
+   * Appelle userService.deleteText pour supprimer un texte de la bibliothèque.
+   * En cas de succès, retire le texte du state.
+   *
+   * @param textId - ID du texte à supprimer (UUID)
+   * @throws Error si la suppression échoue (404 non trouvé, 401 auth, 500 serveur)
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await authStore.deleteSavedText(textId)
+   *   window.$message.success('Texte supprimé')
+   * } catch (err) {
+   *   console.error('Erreur suppression:', authStore.error)
+   * }
+   * ```
+   */
+  const deleteSavedText = async (textId: string): Promise<void> => {
+    loading.value = true
+    error.value = null
+
+    try {
+      // Appel API pour supprimer le texte
+      await userService.deleteText(textId)
+
+      // Suppression du texte dans le state
+      savedTexts.value = savedTexts.value.filter(t => t.id !== textId)
+
+      console.log('Saved text deleted successfully:', textId)
+    } catch (err: unknown) {
+      // Gestion des erreurs
+      if (err instanceof Error) {
+        error.value = err.message
+      } else {
+        error.value = 'Erreur lors de la suppression du texte'
+      }
+      console.error('Delete saved text failed:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ========================================
   // EXPORT DU STORE
   // ========================================
@@ -631,6 +837,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     loading,
     error,
+    savedTexts,
 
     // Getters
     isAuthenticated,
@@ -646,6 +853,10 @@ export const useAuthStore = defineStore('auth', () => {
     resetPassword,
     checkEmailUnique,
     checkPseudoUnique,
-    exportData
+    exportData,
+    fetchSavedTexts,
+    addSavedText,
+    updateSavedText,
+    deleteSavedText
   }
 })

@@ -17,6 +17,19 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { logger } from './logger';
 
 /**
+ * Lazy-loaded token revocation service
+ * We use lazy loading to avoid circular dependencies since tokenRevocationService imports TokenBlacklist model
+ */
+let tokenRevocationService: typeof import('../services/tokenRevocationService') | null = null;
+
+const getTokenRevocationService = async () => {
+  if (!tokenRevocationService) {
+    tokenRevocationService = await import('../services/tokenRevocationService');
+  }
+  return tokenRevocationService;
+};
+
+/**
  * Interface defining the data stored in a JWT token (the "payload")
  * This is the user information we embed in the token
  *
@@ -135,22 +148,26 @@ export const generateRefreshToken = (payload: JWTPayload): string => {
 /**
  * Verify and decode an access token
  *
- * This function checks if the token is valid (properly signed and not expired)
- * and returns the decoded payload if successful.
+ * This function checks if the token is valid (properly signed, not expired)
+ * and checks if it has been revoked. Returns the decoded payload if successful.
  *
+ * SECURITY: This function now checks the token blacklist to ensure revoked tokens
+ * cannot be used for authentication, even if they haven't naturally expired.
+ *
+ * @async
  * @param {string} token - The JWT token to verify
- * @returns {DecodedJWT} The decoded token payload
- * @throws {Error} If token is invalid, expired, or malformed
+ * @returns {Promise<DecodedJWT>} The decoded token payload
+ * @throws {Error} If token is invalid, expired, malformed, or revoked
  *
  * @example
  * try {
- *   const decoded = verifyAccessToken(token);
+ *   const decoded = await verifyAccessToken(token);
  *   console.log('User ID:', decoded.userId);
  * } catch (error) {
- *   console.error('Invalid token');
+ *   console.error('Invalid or revoked token');
  * }
  */
-export const verifyAccessToken = (token: string): DecodedJWT => {
+export const verifyAccessToken = async (token: string): Promise<DecodedJWT> => {
   const secret = process.env['JWT_SECRET'];
 
   if (!secret) {
@@ -163,6 +180,15 @@ export const verifyAccessToken = (token: string): DecodedJWT => {
       algorithms: ['HS256'],
     }) as DecodedJWT;
 
+    // Check if token has been revoked (blacklisted)
+    const revocationService = await getTokenRevocationService();
+    const isRevoked = await revocationService.checkIfTokenRevoked(token);
+
+    if (isRevoked) {
+      logger.warn('Attempt to use revoked access token', { userId: decoded.userId });
+      throw new Error('Token has been revoked');
+    }
+
     logger.debug('Access token verified successfully', { userId: decoded.userId });
     return decoded;
   } catch (error) {
@@ -172,6 +198,8 @@ export const verifyAccessToken = (token: string): DecodedJWT => {
     } else if (error instanceof jwt.JsonWebTokenError) {
       logger.warn('Invalid access token', { error: (error as Error).message });
       throw new Error('Invalid token');
+    } else if (error instanceof Error && error.message === 'Token has been revoked') {
+      throw error;
     } else {
       logger.error('Token verification failed', error);
       throw new Error('Token verification failed');
@@ -185,13 +213,17 @@ export const verifyAccessToken = (token: string): DecodedJWT => {
  * Similar to verifyAccessToken but uses the refresh token secret.
  * Used when a client wants to obtain a new access token.
  *
+ * SECURITY: This function now checks the token blacklist to ensure revoked refresh tokens
+ * cannot be used to generate new access tokens.
+ *
+ * @async
  * @param {string} token - The JWT refresh token to verify
- * @returns {DecodedJWT} The decoded token payload
- * @throws {Error} If token is invalid, expired, or malformed
+ * @returns {Promise<DecodedJWT>} The decoded token payload
+ * @throws {Error} If token is invalid, expired, malformed, or revoked
  *
  * @example
  * try {
- *   const decoded = verifyRefreshToken(refreshToken);
+ *   const decoded = await verifyRefreshToken(refreshToken);
  *   const newAccessToken = generateAccessToken({
  *     userId: decoded.userId,
  *     role: decoded.role
@@ -200,7 +232,7 @@ export const verifyAccessToken = (token: string): DecodedJWT => {
  *   // Require user to log in again
  * }
  */
-export const verifyRefreshToken = (token: string): DecodedJWT => {
+export const verifyRefreshToken = async (token: string): Promise<DecodedJWT> => {
   const secret = process.env['JWT_REFRESH_SECRET'];
 
   if (!secret) {
@@ -213,6 +245,15 @@ export const verifyRefreshToken = (token: string): DecodedJWT => {
       algorithms: ['HS256'],
     }) as DecodedJWT;
 
+    // Check if refresh token has been revoked (blacklisted)
+    const revocationService = await getTokenRevocationService();
+    const isRevoked = await revocationService.checkIfTokenRevoked(token);
+
+    if (isRevoked) {
+      logger.warn('Attempt to use revoked refresh token', { userId: decoded.userId });
+      throw new Error('Refresh token has been revoked');
+    }
+
     logger.debug('Refresh token verified successfully', { userId: decoded.userId });
     return decoded;
   } catch (error) {
@@ -222,6 +263,8 @@ export const verifyRefreshToken = (token: string): DecodedJWT => {
     } else if (error instanceof jwt.JsonWebTokenError) {
       logger.warn('Invalid refresh token', { error: (error as Error).message });
       throw new Error('Invalid refresh token');
+    } else if (error instanceof Error && error.message === 'Refresh token has been revoked') {
+      throw error;
     } else {
       logger.error('Refresh token verification failed', error);
       throw new Error('Token verification failed');

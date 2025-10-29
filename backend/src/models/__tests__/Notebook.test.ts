@@ -279,13 +279,13 @@ describe('Notebook Model', () => {
       const notebook = await Notebook.create({
         userId: testUser.id,
         title: 'No Description',
-        description: null,
+        description: undefined,
         type: 'Voyage',
         format: 'A4',
         orientation: 'portrait',
       });
 
-      expect(notebook.description).toBeNull();
+      expect(notebook.description).toBeUndefined();
     });
   });
 

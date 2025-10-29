@@ -46,6 +46,7 @@ import {
   updateNotebookSchema,
 } from '../middleware/validation';
 import { createRateLimiter } from '../middleware/rateLimiter';
+import { validateId } from '../middleware/uuidValidator';
 
 const router = Router();
 
@@ -223,10 +224,11 @@ router.post(
  *   }
  * }
  *
- * Error: 404 Not Found (if notebook doesn't exist or user is not the owner)
+ * Error: 400 Bad Request (invalid UUID), 404 Not Found (if notebook doesn't exist or user is not the owner)
  */
 router.post(
   '/:id/duplicate',
+  validateId,
   handleDuplicateNotebook
 );
 
@@ -252,10 +254,11 @@ router.post(
  *   }
  * }
  *
- * Error: 404 Not Found (if notebook doesn't exist or user is not the owner)
+ * Error: 400 Bad Request (invalid UUID), 404 Not Found (if notebook doesn't exist or user is not the owner)
  */
 router.put(
   '/:id/archive',
+  validateId,
   handleArchiveNotebook
 );
 
@@ -281,10 +284,11 @@ router.put(
  *   }
  * }
  *
- * Error: 404 Not Found (if notebook doesn't exist or user is not the owner)
+ * Error: 400 Bad Request (invalid UUID), 404 Not Found (if notebook doesn't exist or user is not the owner)
  */
 router.put(
   '/:id/restore',
+  validateId,
   handleRestoreNotebook
 );
 
@@ -318,10 +322,11 @@ router.put(
  *   }
  * }
  *
- * Error: 404 Not Found (if notebook doesn't exist or user is not the owner)
+ * Error: 400 Bad Request (invalid UUID), 404 Not Found (if notebook doesn't exist or user is not the owner)
  */
 router.get(
   '/:id',
+  validateId,
   handleGetNotebook
 );
 
@@ -365,10 +370,11 @@ router.get(
  *   }
  * }
  *
- * Error: 404 Not Found (if notebook doesn't exist or user is not the owner)
+ * Error: 400 Bad Request (invalid UUID or validation error), 404 Not Found (if notebook doesn't exist or user is not the owner)
  */
 router.put(
   '/:id',
+  validateId,
   validate(updateNotebookSchema, 'body'),
   handleUpdateNotebook
 );
@@ -384,7 +390,7 @@ router.put(
  * Response: 204 No Content
  * (No response body)
  *
- * Error: 404 Not Found (if notebook doesn't exist or user is not the owner)
+ * Error: 400 Bad Request (invalid UUID), 404 Not Found (if notebook doesn't exist or user is not the owner)
  *
  * Note: This is a hard delete. The notebook and all associated data
  * (NotebookPermissions) are permanently removed from the database.
@@ -392,6 +398,7 @@ router.put(
  */
 router.delete(
   '/:id',
+  validateId,
   handleDeleteNotebook
 );
 

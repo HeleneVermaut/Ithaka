@@ -48,7 +48,7 @@ const authService = {
   /**
    * Inscription d'un nouvel utilisateur
    *
-   * Envoie une requête POST /api/auth/register avec les données d'inscription.
+   * Envoie une requête POST /auth/register avec les données d'inscription.
    * Le backend crée l'utilisateur, hash le mot de passe avec bcrypt,
    * génère les tokens JWT et les stocke dans des cookies httpOnly.
    *
@@ -74,7 +74,7 @@ const authService = {
    * }
    */
   async register(userData: RegisterData): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/api/auth/register', userData, {
+    const response = await apiClient.post<AuthResponse>('/auth/register', userData, {
       withCredentials: true // Important: Inclure les cookies dans la requête
     })
     return response.data
@@ -83,7 +83,7 @@ const authService = {
   /**
    * Connexion d'un utilisateur existant
    *
-   * Envoie une requête POST /api/auth/login avec email et password.
+   * Envoie une requête POST /auth/login avec email et password.
    * Le backend vérifie les credentials avec bcrypt, génère les tokens JWT
    * et les stocke dans des cookies httpOnly (access token 15 min, refresh token 7 jours).
    *
@@ -104,7 +104,7 @@ const authService = {
    * }
    */
   async login(credentials: LoginData): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/api/auth/login', credentials, {
+    const response = await apiClient.post<AuthResponse>('/auth/login', credentials, {
       withCredentials: true // Important: Inclure les cookies dans la requête
     })
     return response.data
@@ -113,7 +113,7 @@ const authService = {
   /**
    * Déconnexion de l'utilisateur
    *
-   * Envoie une requête POST /api/auth/logout.
+   * Envoie une requête POST /auth/logout.
    * Le backend supprime les cookies httpOnly (Set-Cookie avec Expires=now).
    * Le store Pinia côté client est également nettoyé.
    *
@@ -130,7 +130,7 @@ const authService = {
    * }
    */
   async logout(): Promise<ApiSuccessResponse> {
-    const response = await apiClient.post<ApiSuccessResponse>('/api/auth/logout', {}, {
+    const response = await apiClient.post<ApiSuccessResponse>('/auth/logout', {}, {
       withCredentials: true // Important: Inclure les cookies pour invalidation
     })
     return response.data
@@ -139,7 +139,7 @@ const authService = {
   /**
    * Récupération du profil utilisateur actuel
    *
-   * Envoie une requête GET /api/users/profile.
+   * Envoie une requête GET /users/profile.
    * Le backend vérifie le JWT token depuis les cookies et retourne
    * les informations complètes de l'utilisateur (y compris photo de profil).
    *
@@ -160,7 +160,7 @@ const authService = {
    * }
    */
   async getProfile(): Promise<User> {
-    const response = await apiClient.get<{ success: boolean; user: User }>('/api/users/profile', {
+    const response = await apiClient.get<{ success: boolean; user: User }>('/users/profile', {
       withCredentials: true
     })
     return response.data.user
@@ -169,7 +169,7 @@ const authService = {
   /**
    * Mise à jour du profil utilisateur
    *
-   * Envoie une requête PUT /api/users/profile avec les champs modifiés.
+   * Envoie une requête PUT /users/profile avec les champs modifiés.
    * Le backend vérifie l'unicité de l'email et du pseudo si modifiés,
    * redimensionne la photo si nécessaire, et met à jour l'utilisateur.
    *
@@ -194,7 +194,7 @@ const authService = {
    */
   async updateProfile(profileData: UpdateProfileData): Promise<UpdateProfileResponse> {
     const response = await apiClient.put<UpdateProfileResponse>(
-      '/api/users/profile',
+      '/users/profile',
       profileData,
       {
         withCredentials: true
@@ -206,7 +206,7 @@ const authService = {
   /**
    * Changement du mot de passe utilisateur
    *
-   * Envoie une requête PUT /api/users/password avec l'ancien et le nouveau mot de passe.
+   * Envoie une requête PUT /users/password avec l'ancien et le nouveau mot de passe.
    * Le backend vérifie l'ancien mot de passe avec bcrypt, hash le nouveau,
    * et invalide toutes les autres sessions (refresh tokens) pour forcer la déconnexion.
    *
@@ -231,7 +231,7 @@ const authService = {
    */
   async updatePassword(passwordData: UpdatePasswordData): Promise<ApiSuccessResponse> {
     const response = await apiClient.put<ApiSuccessResponse>(
-      '/api/users/password',
+      '/users/password',
       passwordData,
       {
         withCredentials: true
@@ -243,7 +243,7 @@ const authService = {
   /**
    * Demande de réinitialisation de mot de passe (mot de passe oublié)
    *
-   * Envoie une requête POST /api/auth/forgot-password avec l'email.
+   * Envoie une requête POST /auth/forgot-password avec l'email.
    * Le backend génère un token de réinitialisation (valide 1h), le stocke en BDD,
    * et envoie un email via SendGrid avec un lien contenant le token.
    *
@@ -269,7 +269,7 @@ const authService = {
    */
   async forgotPassword(forgotData: ForgotPasswordData): Promise<ApiSuccessResponse> {
     const response = await apiClient.post<ApiSuccessResponse>(
-      '/api/auth/forgot-password',
+      '/auth/forgot-password',
       forgotData
     )
     return response.data
@@ -278,7 +278,7 @@ const authService = {
   /**
    * Vérification de la validité du token de réinitialisation
    *
-   * Envoie une requête GET /api/auth/verify-reset-token?token=X&email=Y
+   * Envoie une requête GET /auth/verify-reset-token?token=X&email=Y
    * Le backend vérifie que le token existe en BDD, correspond à l'email,
    * et n'est pas expiré (< 1h depuis génération).
    *
@@ -303,7 +303,7 @@ const authService = {
    */
   async verifyResetToken(token: string, email: string): Promise<VerifyResetTokenResponse> {
     const response = await apiClient.get<VerifyResetTokenResponse>(
-      '/api/auth/verify-reset-token',
+      '/auth/verify-reset-token',
       {
         params: { token, email }
       }
@@ -314,7 +314,7 @@ const authService = {
   /**
    * Réinitialisation du mot de passe avec token
    *
-   * Envoie une requête POST /api/auth/reset-password avec token, email et nouveau mot de passe.
+   * Envoie une requête POST /auth/reset-password avec token, email et nouveau mot de passe.
    * Le backend vérifie une dernière fois la validité du token, hash le nouveau mot de passe,
    * met à jour l'utilisateur, efface le token, et invalide toutes les sessions.
    *
@@ -340,7 +340,7 @@ const authService = {
    */
   async resetPassword(resetData: ResetPasswordData): Promise<ApiSuccessResponse> {
     const response = await apiClient.post<ApiSuccessResponse>(
-      '/api/auth/reset-password',
+      '/auth/reset-password',
       resetData
     )
     return response.data
@@ -349,7 +349,7 @@ const authService = {
   /**
    * Vérification asynchrone de l'unicité de l'email
    *
-   * Envoie une requête GET /api/auth/check-email?email=X
+   * Envoie une requête GET /auth/check-email?email=X
    * Le backend vérifie si un utilisateur avec cet email existe déjà en BDD.
    *
    * Cette méthode est utilisée par Vuelidate pour la validation asynchrone
@@ -374,7 +374,7 @@ const authService = {
    * }
    */
   async checkEmailUnique(email: string): Promise<CheckEmailUniqueResponse> {
-    const response = await apiClient.get<CheckEmailUniqueResponse>('/api/auth/check-email', {
+    const response = await apiClient.get<CheckEmailUniqueResponse>('/auth/check-email', {
       params: { email }
     })
     return response.data
@@ -383,7 +383,7 @@ const authService = {
   /**
    * Vérification asynchrone de l'unicité du pseudo
    *
-   * Envoie une requête GET /api/auth/check-pseudo?pseudo=X
+   * Envoie une requête GET /auth/check-pseudo?pseudo=X
    * Le backend vérifie si un utilisateur avec ce pseudo existe déjà en BDD.
    *
    * Cette méthode est utilisée par Vuelidate pour la validation asynchrone
@@ -407,7 +407,7 @@ const authService = {
    * }
    */
   async checkPseudoUnique(pseudo: string): Promise<CheckPseudoUniqueResponse> {
-    const response = await apiClient.get<CheckPseudoUniqueResponse>('/api/auth/check-pseudo', {
+    const response = await apiClient.get<CheckPseudoUniqueResponse>('/auth/check-pseudo', {
       params: { pseudo }
     })
     return response.data
@@ -416,7 +416,7 @@ const authService = {
   /**
    * Export user data in JSON format (GDPR Article 20 - Right to data portability)
    *
-   * Envoie une requête GET /api/users/export pour télécharger toutes les données utilisateur
+   * Envoie une requête GET /users/export pour télécharger toutes les données utilisateur
    * dans un format structuré et lisible par machine (JSON).
    *
    * Le backend retourne un fichier JSON avec :
@@ -443,7 +443,7 @@ const authService = {
    * }
    */
   async exportUserData(): Promise<Blob> {
-    const response = await apiClient.get('/api/users/export', {
+    const response = await apiClient.get('/users/export', {
       responseType: 'blob', // Important: Recevoir les données en Blob pour téléchargement
       withCredentials: true
     })

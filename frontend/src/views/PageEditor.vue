@@ -652,7 +652,7 @@ function getLayerType(type: string | undefined): string {
  * Callback for auto-save composable
  * Serializes canvas and saves to API
  */
-async function handleAutoSaveCallback(elements: any[]): Promise<void> {
+async function handleAutoSaveCallback(): Promise<void> {
   if (!editorStore.canvas || !pageId.value) {
     throw new Error('Canvas or page ID not available')
   }
@@ -767,24 +767,9 @@ onMounted(async () => {
   // Check for unsaved data on mount
   const unsavedData = autoSave.loadFromLocalStorage(pageId.value)
   if (unsavedData && unsavedData.length > 0) {
-    message.warning({
-      title: 'Modifications non sauvegardées détectées',
-      content: 'Des modifications locales ont été trouvées. Voulez-vous les restaurer ?',
-      positiveText: 'Restaurer',
-      negativeText: 'Ignorer',
-      onPositiveClick: () => {
-        // Would load into canvas if we have canvas reference
-        autoSave.forceSave(unsavedData).then(() => {
-          autoSave.clearLocalStorage(pageId.value)
-          message.success('Modifications restaurées et sauvegardées')
-        }).catch((err) => {
-          message.error('Erreur lors de la restauration')
-          console.error(err)
-        })
-      },
-      onNegativeClick: () => {
-        autoSave.clearLocalStorage(pageId.value)
-      }
+    message.warning('Des modifications locales ont été trouvées', {
+      closable: true,
+      duration: 5000
     })
   }
 

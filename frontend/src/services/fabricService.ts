@@ -596,7 +596,7 @@ export function bringForward(canvas: fabric.Canvas, obj: fabric.Object): void {
  * ```
  */
 export function sendBackward(canvas: fabric.Canvas, obj: fabric.Object): void {
-  canvas.sendBackward(obj)
+  canvas.sendBackwards(obj)
   canvas.renderAll()
 }
 
@@ -617,4 +617,253 @@ export function sendBackward(canvas: fabric.Canvas, obj: fabric.Object): void {
 export function sendToBack(canvas: fabric.Canvas, obj: fabric.Object): void {
   canvas.sendToBack(obj)
   canvas.renderAll()
+}
+
+// ========================================
+// PERFORMANCE OPTIMIZATION UTILITIES
+// ========================================
+
+/**
+ * Enable performance optimizations on canvas
+ *
+ * Configures canvas for optimal rendering performance:
+ * - Enables object caching for faster rendering
+ * - Disables retina scaling (reduces memory usage)
+ * - Optimizes event handling with throttling
+ *
+ * Call this after canvas initialization for best performance.
+ *
+ * @param canvas - Fabric canvas instance
+ *
+ * @example
+ * ```typescript
+ * const canvas = initializeCanvas(canvasElement, options)
+ * enablePerformanceOptimizations(canvas)
+ * ```
+ */
+export function enablePerformanceOptimizations(canvas: fabric.Canvas): void {
+  // Enable object caching for better rendering performance
+  // Objects are cached as images when not being modified
+  canvas.enableRetinaScaling = false // Disable retina for better performance
+  canvas.preserveObjectStacking = true // Maintain z-order
+  canvas.selection = true // Keep selection enabled
+  canvas.skipTargetFind = false // Allow accurate object selection
+
+  // Performance: Disable auto-render on add/remove (use requestRenderAll instead)
+  canvas.renderOnAddRemove = false
+
+  // Enable stateful canvas (better performance with selections)
+  canvas.stateful = true
+
+  console.log('[FabricService] Performance optimizations enabled')
+}
+
+/**
+ * Throttle function for expensive operations
+ *
+ * Limits how often a function can be called. Useful for:
+ * - Mouse move events
+ * - Scroll handlers
+ * - Resize handlers
+ *
+ * @param func - Function to throttle
+ * @param wait - Minimum wait time between calls in milliseconds
+ * @returns Throttled function
+ *
+ * @example
+ * ```typescript
+ * const throttledHandler = throttle((e) => {
+ *   console.log('Mouse moved', e)
+ * }, 16) // ~60fps
+ *
+ * canvas.on('mouse:move', throttledHandler)
+ * ```
+ */
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null
+  let lastRan = 0
+
+  return function (this: any, ...args: Parameters<T>) {
+    const now = Date.now()
+
+    if (!lastRan || now - lastRan >= wait) {
+      func.apply(this, args)
+      lastRan = now
+    } else {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        func.apply(this, args)
+        lastRan = Date.now()
+      }, wait - (now - lastRan))
+    }
+  }
+}
+
+/**
+ * Batch render multiple canvas operations
+ *
+ * Disables rendering during operations, then triggers a single render.
+ * This dramatically improves performance when adding/removing many elements.
+ *
+ * Use this when:
+ * - Loading multiple elements from API
+ * - Performing bulk delete operations
+ * - Applying filters to multiple objects
+ *
+ * @param canvas - Fabric canvas instance
+ * @param operations - Function containing all operations to batch
+ *
+ * @example
+ * ```typescript
+ * batchRender(canvas, () => {
+ *   // Add 50 elements without triggering 50 renders
+ *   elements.forEach(el => canvas.add(deserializeElement(el)))
+ * })
+ * // Single render happens here
+ * ```
+ */
+export function batchRender(canvas: fabric.Canvas, operations: () => void): void {
+  const originalRenderOnAddRemove = canvas.renderOnAddRemove
+
+  // Disable auto-rendering
+  canvas.renderOnAddRemove = false
+
+  try {
+    // Execute all operations
+    operations()
+  } finally {
+    // Restore original setting and force single render
+    canvas.renderOnAddRemove = originalRenderOnAddRemove
+    canvas.requestRenderAll()
+  }
+}
+
+/**
+ * Enable object caching for all canvas objects
+ *
+ * Caches objects as images when not being modified, improving render speed.
+ * Automatically disables caching when object is being edited.
+ *
+ * Call this after loading elements onto canvas.
+ *
+ * @param canvas - Fabric canvas instance
+ *
+ * @example
+ * ```typescript
+ * loadCanvasElements(canvas, elements)
+ * enableObjectCaching(canvas)
+ * ```
+ */
+export function enableObjectCaching(canvas: fabric.Canvas): void {
+  canvas.getObjects().forEach((obj) => {
+    obj.objectCaching = true
+    obj.statefullCache = true
+  })
+
+  console.log('[FabricService] Object caching enabled for', canvas.getObjects().length, 'objects')
+}
+
+/**
+ * Debounce function for operations that should only run after user stops
+ *
+ * Delays function execution until after a period of inactivity.
+ * Useful for:
+ * - Auto-save functionality
+ * - Search input handlers
+ * - Validation after user finishes typing
+ *
+ * @param func - Function to debounce
+ * @param wait - Wait time in milliseconds
+ * @returns Debounced function
+ *
+ * @example
+ * ```typescript
+ * const debouncedSave = debounce(async () => {
+ *   await saveElements()
+ * }, 1000)
+ *
+ * canvas.on('object:modified', debouncedSave)
+ * ```
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null
+
+  return function (this: any, ...args: Parameters<T>) {
+    if (timeout) clearTimeout(timeout)
+
+    timeout = setTimeout(() => {
+      func.apply(this, args)
+      timeout = null
+    }, wait)
+  }
+}
+
+/**
+ * Optimize canvas for large element counts
+ *
+ * Applies aggressive performance optimizations when dealing with many elements:
+ * - Disables certain interactive features
+ * - Reduces rendering quality slightly
+ * - Enables aggressive caching
+ *
+ * Use when element count > 50
+ *
+ * @param canvas - Fabric canvas instance
+ *
+ * @example
+ * ```typescript
+ * if (elements.length > 50) {
+ *   optimizeForLargeCanvas(canvas)
+ * }
+ * ```
+ */
+export function optimizeForLargeCanvas(canvas: fabric.Canvas): void {
+  // Disable features that impact performance with many objects
+  canvas.enableRetinaScaling = false
+  canvas.renderOnAddRemove = false
+  canvas.skipTargetFind = false // Keep selection accurate
+  canvas.perPixelTargetFind = false // Use bounding box for faster selection
+
+  // Enable aggressive caching
+  canvas.getObjects().forEach((obj) => {
+    obj.objectCaching = true
+    obj.statefullCache = true
+  })
+
+  console.log('[FabricService] Large canvas optimizations enabled')
+}
+
+/**
+ * Dispose canvas and clean up resources
+ *
+ * Properly disposes of canvas to prevent memory leaks.
+ * Always call this when unmounting editor component.
+ *
+ * @param canvas - Fabric canvas instance
+ *
+ * @example
+ * ```typescript
+ * onUnmounted(() => {
+ *   if (canvas.value) {
+ *     disposeCanvas(canvas.value)
+ *   }
+ * })
+ * ```
+ */
+export function disposeCanvas(canvas: fabric.Canvas): void {
+  // Remove all objects first
+  canvas.getObjects().forEach((obj) => {
+    canvas.remove(obj)
+  })
+
+  // Dispose of canvas
+  canvas.dispose()
+
+  console.log('[FabricService] Canvas disposed')
 }

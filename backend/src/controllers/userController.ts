@@ -22,6 +22,7 @@ import {
 import { User } from '../models/User';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { AuditLogger } from '../utils/auditLogger';
 
 /**
  * Get current user's profile
@@ -160,6 +161,15 @@ export const updateProfile = async (
       updatedFields: Object.keys(updates),
     });
 
+    // Log profile update for audit
+    AuditLogger.logProfileUpdate(
+      userId.toString(),
+      updatedUser.email,
+      Object.keys(updates),
+      req.ip || 'unknown',
+      req.headers['user-agent'] || 'unknown'
+    );
+
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
@@ -223,8 +233,8 @@ export const updatePassword = async (
       throw new AppError('New password and confirmation do not match', 400);
     }
 
-    // Change password via service
-    await changePassword(userId.toString(), oldPassword, newPassword);
+    // Change password via service (pass request for audit logging)
+    await changePassword(userId.toString(), oldPassword, newPassword, req);
 
     logger.info('User password changed', { userId });
 

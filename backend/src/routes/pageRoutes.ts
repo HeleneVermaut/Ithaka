@@ -43,6 +43,7 @@ import {
   handleUpdateElement,
   handleDeleteElement,
 } from '../controllers/elementController';
+import { validateNotebookId, validatePageId, validateElementId } from '../middleware/uuidValidator';
 
 const router = Router();
 
@@ -75,11 +76,12 @@ const router = Router();
  *   ]
  * }
  *
- * Error: 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID), 401 Unauthorized, 404 Not Found
  */
 router.get(
   '/notebooks/:notebookId/pages',
   authenticateUser,
+  validateNotebookId,
   handleGetPages
 );
 
@@ -110,11 +112,12 @@ router.get(
  *   }
  * }
  *
- * Error: 400 Bad Request, 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID or validation error), 401 Unauthorized, 404 Not Found
  */
 router.post(
   '/notebooks/:notebookId/pages',
   authenticateUser,
+  validateNotebookId,
   validate(createPageSchema, 'body'),
   handleCreatePage
 );
@@ -140,11 +143,12 @@ router.post(
  *   }
  * }
  *
- * Error: 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID), 401 Unauthorized, 404 Not Found
  */
 router.get(
   '/pages/:pageId',
   authenticateUser,
+  validatePageId,
   handleGetPage
 );
 
@@ -175,11 +179,12 @@ router.get(
  *   }
  * }
  *
- * Error: 400 Bad Request, 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID or validation error), 401 Unauthorized, 404 Not Found
  */
 router.put(
   '/pages/:pageId',
   authenticateUser,
+  validatePageId,
   validate(updatePageSchema, 'body'),
   handleUpdatePage
 );
@@ -198,11 +203,12 @@ router.put(
  *   "data": null
  * }
  *
- * Error: 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID), 401 Unauthorized, 404 Not Found
  */
 router.delete(
   '/pages/:pageId',
   authenticateUser,
+  validatePageId,
   handleDeletePage
 );
 
@@ -243,11 +249,12 @@ router.delete(
  *   ]
  * }
  *
- * Error: 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID), 401 Unauthorized, 404 Not Found
  */
 router.get(
   '/pages/:pageId/elements',
   authenticateUser,
+  validatePageId,
   handleGetPageElements
 );
 
@@ -290,11 +297,12 @@ router.get(
  *   }
  * }
  *
- * Error: 400 Bad Request, 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID or validation error), 401 Unauthorized, 404 Not Found
  */
 router.post(
   '/pages/:pageId/elements',
   authenticateUser,
+  validatePageId,
   (req, res, next) => validate(batchElementsSchema as any, 'body')(req, res, next),
   handleBatchSaveElements
 );
@@ -333,11 +341,12 @@ router.post(
  *   }
  * }
  *
- * Error: 400 Bad Request, 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID or validation error), 401 Unauthorized, 404 Not Found
  */
 router.put(
   '/elements/:elementId',
   authenticateUser,
+  validateElementId,
   validate(updateElementSchema, 'body'),
   handleUpdateElement
 );
@@ -356,11 +365,12 @@ router.put(
  *   "data": null
  * }
  *
- * Error: 401 Unauthorized, 404 Not Found
+ * Error: 400 Bad Request (invalid UUID), 401 Unauthorized, 404 Not Found
  */
 router.delete(
   '/elements/:elementId',
   authenticateUser,
+  validateElementId,
   handleDeleteElement
 );
 

@@ -1,0 +1,13 @@
+
+> ithaka-frontend@1.0.0 build
+> vue-tsc && vite build
+
+src/stores/__tests__/notebooks.test.ts(46,3): error TS1136: Property assignment expected.
+src/stores/__tests__/notebooks.test.ts(47,12): error TS1005: ')' expected.
+src/stores/__tests__/notebooks.test.ts(47,14): error TS1134: Variable declaration expected.
+src/stores/__tests__/notebooks.test.ts(48,12): error TS1005: ';' expected.
+src/stores/__tests__/notebooks.test.ts(49,12): error TS1005: ';' expected.
+src/stores/__tests__/notebooks.test.ts(50,12): error TS1005: ';' expected.
+src/stores/__tests__/notebooks.test.ts(51,3): error TS1109: Expression expected.
+src/stores/__tests__/notebooks.test.ts(52,1): error TS1128: Declaration or statement expected.
+src/stores/__tests__/notebooks.test.ts(52,2): error TS1128: Declaration or statement expected.

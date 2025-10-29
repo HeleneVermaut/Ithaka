@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import {
   NConfigProvider,
@@ -21,6 +21,8 @@ import {
   lightTheme,
   type GlobalThemeOverrides
 } from 'naive-ui'
+import { useAuthStore } from './stores/auth'
+import { useSessionTimeout } from './composables/useSessionTimeout'
 
 /**
  * Configuration du thème de l'application
@@ -49,6 +51,29 @@ const themeOverrides: GlobalThemeOverrides = {
     infoColor: '#3B82F6' // Bleu info
   }
 }
+
+/**
+ * Session timeout management
+ *
+ * Tracks user session and displays warning before expiration.
+ * Auto-logs out user if session expires.
+ */
+const authStore = useAuthStore()
+const { startSessionTimeout, stopSessionTimeout } = useSessionTimeout()
+
+// Watch authentication state to manage session timeout
+watch(
+  () => authStore.isAuthenticated,
+  (isAuthenticated) => {
+    if (isAuthenticated) {
+      // User just logged in - start session timeout
+      startSessionTimeout()
+    } else {
+      // User logged out - stop session timeout
+      stopSessionTimeout()
+    }
+  }
+)
 </script>
 
 <template>

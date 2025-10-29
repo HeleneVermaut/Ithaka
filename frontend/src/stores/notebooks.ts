@@ -214,6 +214,65 @@ export const useNotebooksStore = defineStore('notebooks', () => {
    */
   const isLoading = computed<boolean>(() => loading.value)
 
+  /**
+   * Calcule le nombre total de pages basé sur la pagination actuelle
+   *
+   * Ce getter calcule dynamiquement le nombre de pages en divisant
+   * le nombre total d'éléments par la limite par page.
+   * Retourne 1 si aucun carnet n'est disponible (pour éviter 0 pages).
+   *
+   * @returns Nombre total de pages (minimum 1)
+   *
+   * @example
+   * ```typescript
+   * const totalPages = computed(() => notebooksStore.totalPages)
+   * console.log(`Page ${pagination.currentPage} sur ${totalPages.value}`)
+   * ```
+   */
+  const totalPages = computed<number>(() => {
+    if (pagination.value.total === 0) return 1
+    return Math.ceil(pagination.value.total / pagination.value.limit)
+  })
+
+  /**
+   * Carnets filtrés selon les critères de recherche et de type
+   *
+   * Ce getter applique les filtres locaux (search, type) à la liste des carnets.
+   * Utilisé pour afficher les résultats de recherche et de filtrage côté client.
+   *
+   * Filtres appliqués :
+   * - search : recherche case-insensitive dans titre et description
+   * - type : filtre exact sur le type de carnet (Voyage, Daily, Reportage)
+   *
+   * @returns Tableau des carnets filtrés
+   *
+   * @example
+   * ```typescript
+   * const filteredNotebooks = computed(() => notebooksStore.filteredNotebooks)
+   * console.log(`${filteredNotebooks.value.length} carnets trouvés`)
+   * ```
+   */
+  const filteredNotebooks = computed<Notebook[]>(() => {
+    let filtered = notebooks.value
+
+    // Filtre par type si défini
+    if (filters.value.type) {
+      filtered = filtered.filter((notebook) => notebook.type === filters.value.type)
+    }
+
+    // Filtre par recherche (case-insensitive) si défini
+    if (filters.value.search && filters.value.search.trim() !== '') {
+      const searchLower = filters.value.search.toLowerCase()
+      filtered = filtered.filter((notebook) => {
+        const titleMatch = notebook.title.toLowerCase().includes(searchLower)
+        const descMatch = notebook.description?.toLowerCase().includes(searchLower) || false
+        return titleMatch || descMatch
+      })
+    }
+
+    return filtered
+  })
+
   // ========================================
   // ACTIONS (Méthodes)
   // ========================================
@@ -871,6 +930,8 @@ export const useNotebooksStore = defineStore('notebooks', () => {
     archivedNotebooks,
     hasNotebooks,
     isLoading,
+    totalPages,
+    filteredNotebooks,
 
     // Actions
     fetchNotebooks,

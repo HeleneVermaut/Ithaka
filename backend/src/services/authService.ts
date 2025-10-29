@@ -19,9 +19,11 @@
 
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { Request } from 'express';
 import { User, UserCreationAttributes } from '../models/User';
 import { sendWelcomeEmail, sendPasswordChangedEmail } from './emailService';
 import { logger } from '../utils/logger';
+import { AuditLogger } from '../utils/auditLogger';
 import { AppError } from '../middleware/errorHandler';
 
 /**
@@ -160,14 +162,19 @@ export const registerUser = async (
  * @async
  * @param {string} email - User's email address
  * @param {string} password - Plain text password
+ * @param {Request} req - Optional Express request for audit logging
  * @returns {Promise<User>} Authenticated user object
  * @throws {AppError} 401 if credentials are invalid
  *
  * @example
- * const user = await loginUser('user@example.com', 'password123');
+ * const user = await loginUser('user@example.com', 'password123', req);
  * // Generate JWT tokens and set cookies
  */
-export const loginUser = async (email: string, password: string): Promise<User> => {
+export const loginUser = async (
+  email: string,
+  password: string,
+  req?: Request
+): Promise<User> => {
   try {
     // Find user by email
     const user = await User.findOne({ where: { email } });
@@ -176,6 +183,12 @@ export const loginUser = async (email: string, password: string): Promise<User> 
     // Use same error message for both cases (security: don't reveal which is wrong)
     if (!user) {
       logger.warn('Login attempt with non-existent email', { email });
+      AuditLogger.logLoginFailure(
+        email,
+        'User not found',
+        req?.ip || 'unknown',
+        req?.headers['user-agent'] || 'unknown'
+      );
       throw new AppError('Invalid email or password', 401);
     }
 
@@ -186,6 +199,12 @@ export const loginUser = async (email: string, password: string): Promise<User> 
         userId: user.id,
         email,
       });
+      AuditLogger.logLoginFailure(
+        email,
+        'Invalid password',
+        req?.ip || 'unknown',
+        req?.headers['user-agent'] || 'unknown'
+      );
       throw new AppError('Invalid email or password', 401);
     }
 
@@ -196,6 +215,14 @@ export const loginUser = async (email: string, password: string): Promise<User> 
       userId: user.id,
       email: user.email,
     });
+
+    // Log successful login
+    AuditLogger.logLoginSuccess(
+      user.id,
+      user.email,
+      req?.ip || 'unknown',
+      req?.headers['user-agent'] || 'unknown'
+    );
 
     return user;
   } catch (error) {
@@ -346,7 +373,8 @@ export const verifyPasswordResetToken = async (
 export const resetPassword = async (
   token: string,
   email: string,
-  newPassword: string
+  newPassword: string,
+  req?: Request
 ): Promise<User> => {
   try {
     // Verify token is valid
@@ -366,6 +394,14 @@ export const resetPassword = async (
       userId: user.id,
       email: user.email,
     });
+
+    // Log password change via reset token
+    AuditLogger.logPasswordChange(
+      user.id,
+      user.email,
+      req?.ip || 'unknown',
+      req?.headers['user-agent'] || 'unknown'
+    );
 
     // Send confirmation email asynchronously
     sendPasswordChangedEmail(user.email, user.firstName).catch((error) => {
@@ -393,17 +429,19 @@ export const resetPassword = async (
  * @param {string} userId - User's unique identifier
  * @param {string} oldPassword - Current password for verification
  * @param {string} newPassword - New password to set
+ * @param {Request} req - Optional Express request for audit logging
  * @returns {Promise<User>} Updated user object
  * @throws {AppError} 401 if old password is incorrect, 404 if user not found
  *
  * @example
- * await changePassword(userId, 'OldPass123', 'NewSecurePass123');
+ * await changePassword(userId, 'OldPass123', 'NewSecurePass123', req);
  * // Password changed, all other sessions invalidated
  */
 export const changePassword = async (
   userId: string,
   oldPassword: string,
-  newPassword: string
+  newPassword: string,
+  req?: Request
 ): Promise<User> => {
   try {
     // Find user
@@ -431,15 +469,25 @@ export const changePassword = async (
     // Hash new password
     const newPasswordHash = await hashPassword(newPassword);
 
-    // Update password
+    // Update password and clear password reset tokens for security consistency
     await user.update({
       passwordHash: newPasswordHash,
+      passwordResetToken: null as any,
+      passwordResetExpiry: null as any,
     });
 
     logger.info('Password changed successfully', {
       userId: user.id,
       email: user.email,
     });
+
+    // Log password change
+    AuditLogger.logPasswordChange(
+      user.id,
+      user.email,
+      req?.ip || 'unknown',
+      req?.headers['user-agent'] || 'unknown'
+    );
 
     // Send confirmation email asynchronously
     sendPasswordChangedEmail(user.email, user.firstName).catch((error) => {

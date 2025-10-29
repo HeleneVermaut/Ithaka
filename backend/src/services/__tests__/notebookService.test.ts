@@ -25,10 +25,8 @@ import * as notebookService from '../notebookService';
 import { Notebook } from '../../models/Notebook';
 import { NotebookPermissions } from '../../models/NotebookPermissions';
 import { User } from '../../models/User';
-import { AppError } from '../../middleware/errorHandler';
 import { sequelize } from '../../config/database';
 import { logger } from '../../utils/logger';
-import { Op } from 'sequelize';
 
 // Mock all dependencies
 jest.mock('../../models/Notebook');
@@ -409,7 +407,7 @@ describe('NotebookService', () => {
       expect(result.notebooks).toEqual(mockNotebooks);
       expect(result.pagination.total).toBe(2);
       expect(result.pagination.currentPage).toBe(1);
-      expect(result.pagination.limit).toBe(12);
+      expect(result.pagination.pageSize).toBe(12);
     });
 
     it('should handle pagination parameters', async () => {
@@ -425,7 +423,7 @@ describe('NotebookService', () => {
         })
       );
       expect(result.pagination.currentPage).toBe(2);
-      expect(result.pagination.limit).toBe(10);
+      expect(result.pagination.pageSize).toBe(10);
     });
 
     it('should handle type filter', async () => {

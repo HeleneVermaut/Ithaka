@@ -148,8 +148,8 @@ export const login = async (
   try {
     const { email, password } = req.body;
 
-    // Authenticate user via service
-    const user = await loginUser(email, password);
+    // Authenticate user via service (pass request for audit logging)
+    const user = await loginUser(email, password, req);
 
     // Generate and set JWT tokens in cookies
     await setAuthTokens(res, {
@@ -250,8 +250,8 @@ export const refresh = async (
       throw new AppError('Refresh token not found. Please login again.', 401);
     }
 
-    // Generate new access token
-    await refreshAccessToken(res, refreshToken);
+    // Generate new access token (pass request for audit logging)
+    await refreshAccessToken(res, refreshToken, req);
 
     logger.info('Access token refreshed successfully');
 
@@ -409,8 +409,8 @@ export const resetPasswordWithToken = async (
       throw new AppError('Passwords do not match', 400);
     }
 
-    // Reset password via service
-    await resetPassword(token, email, newPassword);
+    // Reset password via service (pass request for audit logging)
+    await resetPassword(token, email, newPassword, req);
 
     logger.info('Password reset successful', { email });
 

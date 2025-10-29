@@ -38,11 +38,31 @@ const createApp = (): Application => {
    * - XSS protection
    * - Clickjacking protection
    * - Content sniffing prevention
-   * - And more...
+   * - HSTS (HTTP Strict Transport Security)
+   * - Content Security Policy
    */
   app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP for now (enable in production with proper config)
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", process.env['NODE_ENV'] === 'development' ? "'unsafe-inline'" : "'none'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Required for NaiveUI
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
     crossOriginEmbedderPolicy: false, // Allow embedding for development
+    hsts: {
+      maxAge: 31536000, // 1 year in seconds
+      includeSubDomains: true,
+      preload: true,
+    },
   }));
 
   /**
@@ -52,11 +72,22 @@ const createApp = (): Application => {
    * Important security settings:
    * - credentials: true - Allows cookies to be sent with requests
    * - origin - Only specified origins can make requests
+   *
+   * Security: In production, ALLOWED_ORIGINS must be explicitly configured.
+   * In development, localhost origins are allowed as fallback.
+   * This prevents accidental production deployment without proper CORS configuration.
    */
-  const allowedOrigins = process.env['ALLOWED_ORIGINS']?.split(',') || [
-    'http://localhost:3001',
-    'http://localhost:5173',
-  ];
+  const allowedOrigins = (process.env['ALLOWED_ORIGINS'] || '').split(',').filter(Boolean);
+
+  // In development, allow localhost if no origins configured
+  if (allowedOrigins.length === 0) {
+    if (process.env['NODE_ENV'] === 'development') {
+      allowedOrigins.push('http://localhost:3001', 'http://localhost:5173');
+      logger.info('CORS: Using default localhost origins for development');
+    } else {
+      throw new Error('ALLOWED_ORIGINS must be defined in production environment');
+    }
+  }
 
   app.use(
     cors({
@@ -131,16 +162,44 @@ const createApp = (): Application => {
 
   /**
    * Health Check Endpoint
-   * Simple endpoint to verify the server is running
+   * Verifies that the server and database are running properly
    * Used by load balancers and monitoring tools
+   *
+   * Returns:
+   * - 200 OK: Server and database are healthy
+   * - 503 Service Unavailable: Server is up but database is unreachable
+   *
+   * This endpoint is critical for production deployments where load balancers
+   * need to know if the service can handle traffic. A server without database
+   * connectivity should not receive traffic.
    */
-  app.get('/health', (_req, res) => {
-    res.status(200).json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env['NODE_ENV'] || 'development',
-    });
+  app.get('/health', async (_req, res) => {
+    try {
+      // Import sequelize here to avoid circular dependencies
+      const { sequelize } = await import('./config/database');
+
+      // Test database connectivity with a simple query
+      await sequelize.authenticate();
+
+      res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env['NODE_ENV'] || 'development',
+        database: 'connected',
+      });
+    } catch (error) {
+      logger.error('Health check failed: Database unreachable', { error });
+
+      res.status(503).json({
+        status: 'error',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env['NODE_ENV'] || 'development',
+        database: 'disconnected',
+        message: 'Service unavailable - database connection failed',
+      });
+    }
   });
 
   /**

@@ -29,12 +29,6 @@ export const PAGE_FORMATS = {
 } as const;
 
 /**
- * Conversion factor from millimeters to pixels at 300 DPI
- * Formula: 300 DPI / 25.4 mm per inch ≈ 11.8110
- */
-const MM_TO_PX_FACTOR = DPI / 25.4;
-
-/**
  * Converts millimeters to pixels at a given DPI.
  * Uses 300 DPI standard for print-quality output by default.
  *

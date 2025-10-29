@@ -9,6 +9,24 @@
 
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 import type { ApiError } from '@/types/models'
+import { getErrorMessageFromStatus, ERROR_MESSAGES } from '@/constants/errorMessages'
+import { debugLog, DebugCategory, DEBUG } from '@/utils/debug'
+
+/**
+ * Environment variable validation
+ *
+ * Ensures that VITE_API_BASE_URL is properly configured before creating the API client.
+ * This prevents runtime errors and provides clear feedback during development.
+ */
+const baseURL = import.meta.env.VITE_API_BASE_URL
+
+if (!baseURL) {
+  throw new Error(
+    'VITE_API_BASE_URL environment variable is not defined. ' +
+    'Please check your .env file and ensure VITE_API_BASE_URL is set correctly. ' +
+    'Example: VITE_API_BASE_URL=http://localhost:3000/api'
+  )
+}
 
 /**
  * Instance Axios configurée pour communiquer avec le backend
@@ -17,8 +35,8 @@ import type { ApiError } from '@/types/models'
  * que d'appeler axios directement
  */
 const apiClient: AxiosInstance = axios.create({
-  // URL de base du backend (définie dans .env)
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  // URL de base du backend (définie dans .env et validée ci-dessus)
+  baseURL: baseURL,
 
   // Timeout après 30 secondes (30000 ms)
   timeout: 30000,
@@ -47,12 +65,11 @@ const apiClient: AxiosInstance = axios.create({
  */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    // Mode debug : affiche les détails de la requête dans la console
-    if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-      console.log('API Request:', {
-        method: config.method?.toUpperCase(),
-        url: config.url,
-        data: config.data
+    // Debug mode: log request details
+    if (DEBUG) {
+      debugLog(DebugCategory.API, `Request: ${config.method?.toUpperCase()} ${config.url}`, {
+        data: config.data,
+        params: config.params
       })
     }
 
@@ -60,7 +77,9 @@ apiClient.interceptors.request.use(
   },
   (error: AxiosError): Promise<AxiosError> => {
     // En cas d'erreur lors de la préparation de la requête
-    console.error('Request interceptor error:', error)
+    if (DEBUG) {
+      debugLog(DebugCategory.API, 'Request interceptor error', { error })
+    }
     return Promise.reject(error)
   }
 )
@@ -114,11 +133,9 @@ const processQueue = (error: Error | null, token: string | null = null): void =>
  */
 apiClient.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => {
-    // Mode debug : affiche les détails de la réponse dans la console
-    if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-      console.log('API Response:', {
-        status: response.status,
-        url: response.config.url,
+    // Debug mode: log response details
+    if (DEBUG) {
+      debugLog(DebugCategory.API, `Response: ${response.status} ${response.config.url}`, {
         data: response.data
       })
     }
@@ -134,23 +151,14 @@ apiClient.interceptors.response.use(
     // ========================================
 
     if (error.code === 'ECONNABORTED') {
-      console.error('Request timeout - exceeded 30 second limit')
+      debugLog(DebugCategory.API, 'Request timeout - exceeded 30 second limit')
 
-      // Create user-friendly timeout error
-      const timeoutError = new AxiosError(
-        'Délai d\'attente dépassé - La requête a pris trop longtemps. Vérifiez votre connexion Internet.',
-        'ECONNABORTED',
-        error.config,
-        error.request,
-        { status: 408, statusText: 'Request Timeout', data: null } as any
-      )
-
-      // Show timeout message if notifications available
+      // Show user-friendly timeout message
       if (typeof window !== 'undefined' && (window as any).$message) {
-        (window as any).$message.error('Connexion lente - Délai d\'attente dépassé')
+        (window as any).$message.error(ERROR_MESSAGES.NETWORK_ERROR)
       }
 
-      return Promise.reject(timeoutError)
+      return Promise.reject(error)
     }
 
     // ========================================
@@ -158,11 +166,11 @@ apiClient.interceptors.response.use(
     // ========================================
 
     if (error.message === 'Network Error' && !error.response) {
-      console.error('Network error - No response from server')
+      debugLog(DebugCategory.API, 'Network error - No response from server')
 
-      // Show network error if notifications available
+      // Show network error
       if (typeof window !== 'undefined' && (window as any).$message) {
-        (window as any).$message.error('Erreur réseau - Vérifiez votre connexion Internet')
+        (window as any).$message.error(ERROR_MESSAGES.NETWORK_ERROR)
       }
 
       return Promise.reject(error)
@@ -176,12 +184,28 @@ apiClient.interceptors.response.use(
     if (error.response) {
       const status = error.response.status
       const errorData = error.response.data
+      const userMessage = getErrorMessageFromStatus(status)
+
+      // Log API error in debug mode
+      if (DEBUG) {
+        debugLog(DebugCategory.API, `Error: ${status} ${originalRequest?.url}`, {
+          status,
+          data: errorData
+        })
+      }
+
+      // Show user-friendly error message
+      if (typeof window !== 'undefined' && (window as any).$message && status !== 401) {
+        (window as any).$message.error(userMessage)
+      }
 
       // 401 Unauthorized : Tentative d'auto-refresh du token
       if (status === 401 && originalRequest && !originalRequest._retry) {
         // Éviter l'auto-refresh sur l'endpoint /auth/refresh lui-même
         if (originalRequest.url?.includes('/auth/refresh')) {
-          console.warn('Refresh token expired - User will be logged out')
+          if (DEBUG) {
+            debugLog(DebugCategory.API, 'Refresh token expired - User will be logged out')
+          }
           return Promise.reject(error)
         }
 
@@ -206,12 +230,16 @@ apiClient.interceptors.response.use(
         isRefreshing = true
 
         try {
-          console.log('Access token expired - Attempting auto-refresh')
+          if (DEBUG) {
+            debugLog(DebugCategory.API, 'Access token expired - Attempting auto-refresh')
+          }
 
           // Appeler l'endpoint de refresh
           await apiClient.post('/auth/refresh')
 
-          console.log('Token refresh successful - Retrying original request')
+          if (DEBUG) {
+            debugLog(DebugCategory.API, 'Token refresh successful - Retrying original request')
+          }
 
           // Refresh réussi, traiter la queue
           processQueue(null, null)
@@ -221,7 +249,9 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest)
         } catch (refreshError) {
           // Refresh échoué (refresh token expiré ou invalide)
-          console.error('Token refresh failed:', refreshError)
+          if (DEBUG) {
+            debugLog(DebugCategory.API, 'Token refresh failed', { error: refreshError })
+          }
           processQueue(refreshError as Error, null)
           isRefreshing = false
 
@@ -241,17 +271,23 @@ apiClient.interceptors.response.use(
 
       // 403 Forbidden : L'utilisateur n'a pas les permissions
       if (status === 403) {
-        console.warn('Access forbidden - Insufficient permissions')
+        if (DEBUG) {
+          debugLog(DebugCategory.API, 'Access forbidden - Insufficient permissions')
+        }
       }
 
       // 404 Not Found : La ressource demandée n'existe pas
       if (status === 404) {
-        console.warn('Resource not found:', error.response.config?.url)
+        if (DEBUG) {
+          debugLog(DebugCategory.API, 'Resource not found', { url: error.response.config?.url })
+        }
       }
 
       // 408 Request Timeout
       if (status === 408) {
-        console.error('Server request timeout')
+        if (DEBUG) {
+          debugLog(DebugCategory.API, 'Server request timeout')
+        }
         if (typeof window !== 'undefined' && (window as any).$message) {
           (window as any).$message.error('Délai d\'attente du serveur dépassé')
         }
@@ -259,7 +295,9 @@ apiClient.interceptors.response.use(
 
       // 500 Server Error : Erreur interne du serveur
       if (status >= 500) {
-        console.error('Server error:', errorData)
+        if (DEBUG) {
+          debugLog(DebugCategory.API, 'Server error', { status, data: errorData })
+        }
         if (typeof window !== 'undefined' && (window as any).$message) {
           (window as any).$message.error('Erreur serveur - Veuillez réessayer plus tard')
         }
@@ -267,14 +305,18 @@ apiClient.interceptors.response.use(
     } else if (error.request) {
       // La requête a été envoyée mais aucune réponse n'a été reçue
       // Cela peut arriver si le serveur est down ou si il y a un problème réseau
-      console.error('No response from server - Network error or server down')
+      if (DEBUG) {
+        debugLog(DebugCategory.API, 'No response from server - Network error or server down')
+      }
 
       if (typeof window !== 'undefined' && (window as any).$message) {
         (window as any).$message.error('Aucune réponse du serveur')
       }
     } else {
       // Une erreur s'est produite lors de la configuration de la requête
-      console.error('Request setup error:', error.message)
+      if (DEBUG) {
+        debugLog(DebugCategory.API, 'Request setup error', { message: error.message })
+      }
     }
 
     return Promise.reject(error)

@@ -11,7 +11,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** URL de base de l'API backend (ex: http://localhost:8000) */
+  /** URL de base de l'API backend (ex: http://localhost:3000/api) - Must include /api prefix */
   readonly VITE_API_BASE_URL: string
 
   /** Environnement d'exécution (development | production | test) */

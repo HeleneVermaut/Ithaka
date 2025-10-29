@@ -82,7 +82,7 @@ export const authenticateUser = async (
 
     // Verify and decode the token
     try {
-      const decoded = verifyAccessToken(token);
+      const decoded = await verifyAccessToken(token);
 
       // Attach user information to request object
       // This makes user data available to all subsequent middleware and route handlers
@@ -152,7 +152,7 @@ export const optionalAuth = async (
     }
 
     try {
-      const decoded = verifyAccessToken(token);
+      const decoded = await verifyAccessToken(token);
       req.user = decoded;
 
       logger.debug('Optional auth: User authenticated', {

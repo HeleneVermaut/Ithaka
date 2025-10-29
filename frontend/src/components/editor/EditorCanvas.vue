@@ -1,5 +1,27 @@
 <template>
-  <div class="editor-canvas-container" :style="containerStyle">
+  <div
+    class="editor-canvas-container"
+    :style="containerStyle"
+    @dragover.prevent="onCanvasDragOver"
+    @drop="onCanvasDrop"
+  >
+    <!-- Grid Toggle Button -->
+    <div class="canvas-controls">
+      <button
+        :class="['grid-toggle', { 'grid-toggle--active': showGrid }]"
+        @click="toggleGrid"
+        :title="showGrid ? 'Hide Grid' : 'Show Grid'"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="18" height="18" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="7" y1="1" x2="7" y2="19" stroke="currentColor" stroke-width="1"/>
+          <line x1="13" y1="1" x2="13" y2="19" stroke="currentColor" stroke-width="1"/>
+          <line x1="1" y1="7" x2="19" y2="7" stroke="currentColor" stroke-width="1"/>
+          <line x1="1" y1="13" x2="19" y2="13" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+    </div>
+
     <canvas
       ref="canvasElement"
       class="editor-canvas"
@@ -42,6 +64,8 @@ import { fabric } from 'fabric'
 import { getCanvasDimensions } from '@/utils/unitConversion'
 import * as fabricService from '@/services/fabricService'
 import type { SerializedElement } from '@/services/fabricService'
+import { debugLog, debugError, debugCanvasState, DebugCategory, DEBUG, DebugTimer } from '@/utils/debug'
+import { ERROR_MESSAGES } from '@/constants/errorMessages'
 
 // ========================================
 // PROPS & EMITS
@@ -83,6 +107,15 @@ const isInitialized = ref<boolean>(false)
 /** Flag to prevent duplicate events */
 let isUpdating = false
 
+/** Grid visibility state */
+const showGrid = ref<boolean>(false)
+
+/** Grid size in millimeters (10mm = 37.8px at 96 DPI) */
+const GRID_SIZE_MM = 10
+
+/** Store grid line objects for later removal */
+let gridLines: fabric.Line[] = []
+
 // ========================================
 // COMPUTED PROPERTIES
 // ========================================
@@ -116,7 +149,11 @@ const containerStyle = computed(() => {
 function initializeCanvas(): void {
   if (!canvasElement.value || isInitialized.value) return
 
+  const timer = new DebugTimer('initializeCanvas')
+
   try {
+    if (DEBUG) debugLog(DebugCategory.CANVAS, 'Initializing canvas', { format: props.pageFormat, orientation: props.orientation })
+
     const dimensions = getCanvasDimensions(props.pageFormat, props.orientation)
 
     fabricCanvas = fabricService.initializeCanvas(canvasElement.value, {
@@ -135,11 +172,19 @@ function initializeCanvas(): void {
     // Emit ready event with canvas instance
     emit('canvasReady', fabricCanvas)
 
-    console.log(
-      `Canvas initialized: ${props.pageFormat} ${props.orientation} (${dimensions.widthPx.toFixed(2)}x${dimensions.heightPx.toFixed(2)}px)`
-    )
+    if (DEBUG) {
+      debugLog(DebugCategory.CANVAS, 'Canvas initialized successfully', {
+        format: props.pageFormat,
+        orientation: props.orientation,
+        width: dimensions.widthPx.toFixed(2),
+        height: dimensions.heightPx.toFixed(2)
+      })
+    }
+
+    timer.end(100) // Warn if > 100ms
   } catch (error) {
-    console.error('Failed to initialize canvas:', error)
+    debugError(DebugCategory.CANVAS, 'Failed to initialize canvas', error)
+    window.$message?.error(ERROR_MESSAGES.CANVAS_INIT_FAILED)
   }
 }
 
@@ -162,8 +207,8 @@ function setupCanvasListeners(): void {
 
     const selected = e.selected?.[0]
     if (selected && selected.data?.elementId) {
+      if (DEBUG) debugLog(DebugCategory.CANVAS, 'Element selected', { elementId: selected.data.elementId, type: selected.type })
       emit('elementSelected', selected.data.elementId)
-      console.log(`Element selected: ${selected.data.elementId}`)
     }
   })
 
@@ -173,8 +218,8 @@ function setupCanvasListeners(): void {
 
     const selected = e.selected?.[0]
     if (selected && selected.data?.elementId) {
+      if (DEBUG) debugLog(DebugCategory.CANVAS, 'Selection updated', { elementId: selected.data.elementId, type: selected.type })
       emit('elementSelected', selected.data.elementId)
-      console.log(`Element selection updated: ${selected.data.elementId}`)
     }
   })
 
@@ -182,8 +227,8 @@ function setupCanvasListeners(): void {
   fabricCanvas.on('selection:cleared', () => {
     if (isUpdating) return
 
+    if (DEBUG) debugLog(DebugCategory.CANVAS, 'Selection cleared')
     emit('selectionCleared')
-    console.log('Selection cleared')
   })
 
   // When object is modified (moved, resized, rotated, scaled)
@@ -201,8 +246,8 @@ function setupCanvasListeners(): void {
         width: obj.width,
         height: obj.height
       }
+      if (DEBUG) debugLog(DebugCategory.CANVAS, 'Element modified', { elementId: obj.data.elementId, changes })
       emit('elementModified', obj.data.elementId, changes)
-      console.log(`Element modified: ${obj.data.elementId}`, changes)
     }
   })
 
@@ -213,12 +258,14 @@ function setupCanvasListeners(): void {
   })
 
   // When object is added (for z-index tracking)
-  fabricCanvas.on('object:added', () => {
+  fabricCanvas.on('object:added', (e: any) => {
+    if (DEBUG && e.target) debugLog(DebugCategory.CANVAS, 'Object added', { type: e.target.type, id: e.target.data?.elementId })
     updateZIndexes()
   })
 
   // When object is removed
-  fabricCanvas.on('object:removed', () => {
+  fabricCanvas.on('object:removed', (e: any) => {
+    if (DEBUG && e.target) debugLog(DebugCategory.CANVAS, 'Object removed', { type: e.target.type, id: e.target.data?.elementId })
     updateZIndexes()
   })
 }
@@ -245,6 +292,68 @@ function onCanvasMouseDown(): void {
   // This handler can be extended for custom interactions
 }
 
+/**
+ * Handle dragover event on canvas to allow dropping
+ */
+function onCanvasDragOver(event: DragEvent): void {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
+
+/**
+ * Handle drop event on canvas to add text from library
+ */
+async function onCanvasDrop(event: DragEvent): Promise<void> {
+  event.preventDefault()
+
+  if (!fabricCanvas) return
+
+  // Try to get JSON data (for saved texts from library)
+  const jsonData = event.dataTransfer?.getData('application/json')
+  if (!jsonData) return
+
+  try {
+    const savedText = JSON.parse(jsonData)
+
+    // Get drop coordinates relative to canvas
+    const canvasRect = (event.target as HTMLElement).getBoundingClientRect()
+    const x = event.clientX - canvasRect.left
+    const y = event.clientY - canvasRect.top
+
+    // Create fabric text object from saved text
+    const fabricText = new fabric.Textbox(savedText.content.text, {
+      left: x,
+      top: y,
+      fontFamily: savedText.content.fontFamily,
+      fontSize: savedText.content.fontSize,
+      fill: savedText.content.fill || '#000000',
+      textAlign: savedText.content.textAlign || 'left',
+      fontWeight: savedText.content.fontWeight || 'normal',
+      fontStyle: savedText.content.fontStyle || 'normal',
+      underline: savedText.content.underline || false,
+      lineHeight: savedText.content.lineHeight || 1.2,
+      width: 300 // Default width for textbox
+    })
+
+    // Add data for element tracking
+    if (!fabricText.data) {
+      fabricText.data = {}
+    }
+    fabricText.data.elementId = `text-${Date.now()}`
+
+    // Add to canvas
+    fabricCanvas.add(fabricText)
+    fabricCanvas.setActiveObject(fabricText)
+    fabricCanvas.renderAll()
+
+    console.log('Text dropped and added to canvas:', fabricText.data.elementId)
+  } catch (error) {
+    console.error('Failed to parse dropped text:', error)
+  }
+}
+
 // ========================================
 // ELEMENT LOADING
 // ========================================
@@ -258,21 +367,28 @@ watch(
   (newElements) => {
     if (!fabricCanvas || !isInitialized.value) return
 
+    const timer = new DebugTimer('loadCanvasElements')
+
     if (Array.isArray(newElements) && newElements.length > 0) {
       isUpdating = true
 
       try {
+        if (DEBUG) debugLog(DebugCategory.CANVAS, 'Loading elements', { count: newElements.length })
+
         fabricService.loadCanvasElements(fabricCanvas, newElements)
         updateZIndexes()
 
-        console.log(`Loaded ${newElements.length} elements onto canvas`)
+        if (DEBUG) debugLog(DebugCategory.CANVAS, 'Elements loaded successfully', { count: newElements.length })
+        timer.end(200) // Warn if > 200ms
       } catch (error) {
-        console.error('Failed to load elements:', error)
+        debugError(DebugCategory.CANVAS, 'Failed to load elements', error)
+        window.$message?.error(ERROR_MESSAGES.LOAD_FAILED)
       } finally {
         isUpdating = false
       }
     } else {
       // Clear canvas if elements is empty
+      if (DEBUG) debugLog(DebugCategory.CANVAS, 'Clearing canvas (no elements)')
       fabricService.clearCanvas(fabricCanvas)
     }
   },
@@ -293,6 +409,88 @@ watch(
     initializeCanvas()
   }
 )
+
+// ========================================
+// GRID VISUALIZATION
+// ========================================
+
+/**
+ * Toggle grid visibility on/off
+ * Grid uses 10mm spacing (37.8px at 96 DPI)
+ */
+function toggleGrid(): void {
+  showGrid.value = !showGrid.value
+
+  if (showGrid.value) {
+    drawGrid()
+  } else {
+    clearGrid()
+  }
+}
+
+/**
+ * Draw grid lines on canvas
+ * Grid spacing: 10mm = 37.8px at 96 DPI
+ */
+function drawGrid(): void {
+  if (!fabricCanvas) return
+
+  // Convert mm to px (96 DPI: 1mm = 3.7795px)
+  const mmToPx = 96 / 25.4
+  const gridSizePx = GRID_SIZE_MM * mmToPx // ~37.8px
+
+  const canvasWidth = fabricCanvas.width || 794
+  const canvasHeight = fabricCanvas.height || 1123
+
+  // Clear existing grid lines
+  clearGrid()
+
+  // Create vertical lines
+  for (let x = 0; x <= canvasWidth; x += gridSizePx) {
+    const line = new fabric.Line([x, 0, x, canvasHeight], {
+      stroke: '#e0e0e0',
+      strokeWidth: 0.5,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true
+    })
+    gridLines.push(line)
+    fabricCanvas.add(line)
+  }
+
+  // Create horizontal lines
+  for (let y = 0; y <= canvasHeight; y += gridSizePx) {
+    const line = new fabric.Line([0, y, canvasWidth, y], {
+      stroke: '#e0e0e0',
+      strokeWidth: 0.5,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true
+    })
+    gridLines.push(line)
+    fabricCanvas.add(line)
+  }
+
+  // Send grid lines to back
+  gridLines.forEach(line => fabricCanvas!.sendToBack(line))
+  fabricCanvas.requestRenderAll()
+
+  console.log(`Grid drawn: ${gridLines.length} lines (${GRID_SIZE_MM}mm spacing)`)
+}
+
+/**
+ * Clear grid lines from canvas
+ */
+function clearGrid(): void {
+  if (!fabricCanvas) return
+
+  // Remove all grid line objects
+  gridLines.forEach(line => fabricCanvas!.remove(line))
+  gridLines = []
+
+  fabricCanvas.requestRenderAll()
+  console.log('Grid cleared')
+}
 
 // ========================================
 // LIFECYCLE HOOKS
@@ -326,6 +524,18 @@ onMounted(() => {
   setTimeout(() => {
     initializeCanvas()
     setupSelectionFeedback()
+
+    // Add global debug command
+    if (DEBUG && fabricCanvas) {
+      (window as any).debugCanvas = () => {
+        if (fabricCanvas) {
+          debugCanvasState(fabricCanvas)
+        } else {
+          console.warn('Canvas not initialized')
+        }
+      }
+      if (DEBUG) debugLog(DebugCategory.CANVAS, 'Global debug command available: window.debugCanvas()')
+    }
   }, 0)
 })
 
@@ -333,6 +543,8 @@ onMounted(() => {
  * Cleanup canvas when component unmounts
  */
 onUnmounted(() => {
+  if (DEBUG) debugLog(DebugCategory.CANVAS, 'Unmounting canvas component')
+
   if (fabricCanvas) {
     fabricCanvas.dispose()
     fabricCanvas = null
@@ -340,7 +552,7 @@ onUnmounted(() => {
 
   isInitialized.value = false
 
-  console.log('Canvas disposed and cleanup completed')
+  if (DEBUG) debugLog(DebugCategory.CANVAS, 'Canvas disposed and cleanup completed')
 })
 </script>
 
@@ -351,6 +563,7 @@ onUnmounted(() => {
  * Container uses aspect-ratio to maintain page proportions
  * Canvas fills container using 100% width/height
  * Responsive design adapts to screen sizes
+ * Includes grid controls and smooth animations
  */
 
 .editor-canvas-container {
@@ -367,7 +580,56 @@ onUnmounted(() => {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-/* Border animé quand élément sélectionné */
+/* Canvas Controls (Grid Toggle, etc.) */
+.canvas-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+
+.grid-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: white;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #666;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.grid-toggle:hover {
+  background: #f5f5f5;
+  border-color: #18a058;
+  color: #18a058;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.grid-toggle:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.grid-toggle--active {
+  background: #18a058;
+  border-color: #18a058;
+  color: white;
+}
+
+.grid-toggle--active:hover {
+  background: #16954f;
+  border-color: #16954f;
+}
+
+/* Border animation when element is selected */
 .editor-canvas-container::after {
   content: '';
   position: absolute;
@@ -404,5 +666,38 @@ onUnmounted(() => {
 
 .editor-canvas::selection {
   background: transparent;
+}
+
+/* Smooth transitions for Fabric.js objects */
+.editor-canvas :deep(.canvas-container) {
+  transition: transform 0.2s ease;
+}
+
+/* Selection animations */
+.editor-canvas :deep(.fabric-object) {
+  transition: opacity 0.2s ease;
+}
+
+.editor-canvas :deep(.fabric-object:hover) {
+  cursor: move;
+}
+
+/* Control handle animations */
+.editor-canvas :deep(.control-point) {
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.editor-canvas :deep(.control-point:hover) {
+  transform: scale(1.2);
+  background-color: #18a058 !important;
+}
+
+/* Rotation handle animation */
+.editor-canvas :deep(.rotating-point) {
+  transition: transform 0.15s ease;
+}
+
+.editor-canvas :deep(.rotating-point:hover) {
+  transform: scale(1.3);
 }
 </style>

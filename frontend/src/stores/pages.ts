@@ -24,6 +24,7 @@ import type {
   IPageElement,
   IPageElementCreateRequest,
 } from '@/types/models'
+import { debugLog, debugStateChange, debugError, DebugCategory, DebugTimer } from '@/utils/debug'
 
 /**
  * Store Pinia pour la gestion des pages et éléments
@@ -115,6 +116,9 @@ export const usePagesStore = defineStore('pages', () => {
    * await loadPage('page-123');
    */
   const loadPage = async (pageId: string): Promise<void> => {
+    const timer = new DebugTimer('loadPage')
+    debugStateChange('pages', 'loadPage', { pageId })
+
     loading.value = true
     error.value = null
     try {
@@ -128,8 +132,15 @@ export const usePagesStore = defineStore('pages', () => {
 
       // Réinitialiser les changements non sauvegardés
       unsavedElements.value.clear()
+
+      debugLog(DebugCategory.STATE, 'Page loaded successfully', {
+        pageId,
+        elementCount: pageElements.length
+      })
+      timer.end(500) // Warn if > 500ms
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load page'
+      debugError(DebugCategory.STATE, 'Failed to load page', err)
       throw err
     } finally {
       loading.value = false
@@ -153,8 +164,12 @@ export const usePagesStore = defineStore('pages', () => {
    * });
    */
   const addElement = (elementData: IPageElementCreateRequest): void => {
+    debugStateChange('pages', 'addElement', { type: elementData.type })
+
     if (!currentPage.value) {
-      throw new Error('No page currently loaded')
+      const error = new Error('No page currently loaded')
+      debugError(DebugCategory.STATE, 'Cannot add element - no page loaded', error)
+      throw error
     }
 
     const pageId = currentPage.value.id
@@ -180,6 +195,12 @@ export const usePagesStore = defineStore('pages', () => {
 
     // Ajouter aux changements non sauvegardés
     unsavedElements.value.set(tempId, unsavedElement)
+
+    debugLog(DebugCategory.STATE, 'Element added (unsaved)', {
+      tempId,
+      type: elementData.type,
+      zIndex: newZIndex
+    })
   }
 
   /**

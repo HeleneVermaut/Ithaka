@@ -26,6 +26,7 @@
           class="form-control textarea"
           :class="{ 'is-invalid': $v.text.$invalid && $v.text.$dirty }"
           @blur="$v.text.$touch()"
+          data-testid="text-content-input"
         ></textarea>
         <div v-if="$v.text.$invalid && $v.text.$dirty" class="error-feedback">
           <p v-for="error of $v.text.$errors" :key="error.$uid">{{ error.$message }}</p>
@@ -65,6 +66,7 @@
             class="form-control"
             :class="{ 'is-invalid': $v.fontSize.$invalid && $v.fontSize.$dirty }"
             @blur="$v.fontSize.$touch()"
+            data-testid="font-size-input"
           />
           <span class="unit">px</span>
         </div>
@@ -93,6 +95,7 @@
             type="color"
             class="color-input"
             @change="$v.color.$touch()"
+            data-testid="color-input"
           />
           <input
             type="text"
@@ -179,17 +182,19 @@
           type="submit"
           class="btn btn-primary"
           :disabled="$v.$invalid || isFontsLoading"
+          data-testid="add-text-button"
         >
           {{ isAdding ? 'Ajouter au canvas' : 'Modifier' }}
         </button>
         <button
           type="button"
           class="btn btn-secondary"
-          @click="handleSaveToLibrary"
+          @click="openSaveModal"
           :disabled="$v.$invalid || isFontsLoading"
-          title="Sauvegarder ce style dans votre bibliothèque"
+          title="Enregistrer ce texte dans votre bibliothèque"
+          data-testid="save-to-library-button"
         >
-          Sauvegarder le style
+          Enregistrer dans la bibliothèque
         </button>
         <button
           v-if="!isAdding && selectedElement"
@@ -197,6 +202,7 @@
           class="btn btn-danger"
           @click="$emit('deleteRequested')"
           title="Supprimer cet élément"
+          data-testid="delete-text-button"
         >
           Supprimer l'élément
         </button>
@@ -210,6 +216,14 @@
         </button>
       </div>
     </form>
+
+    <!-- Save Text Modal -->
+    <SaveTextModal
+      :show="showSaveModal"
+      :initial-label="formData.text.substring(0, 50)"
+      @update:show="showSaveModal = $event"
+      @save="handleSaveTextToLibrary"
+    />
   </div>
 </template>
 
@@ -220,7 +234,10 @@ import { required, minValue, maxValue } from '@vuelidate/validators'
 import { validateTextContent, validateColorHex } from '@/composables/useValidation'
 import TextPreview from './TextPreview.vue'
 import FontSelector from './FontSelector.vue'
+import SaveTextModal from '@/components/library/SaveTextModal.vue'
+import { useAuthStore } from '@/stores/auth'
 import type { Font } from '@/services/fontService'
+import { ERROR_MESSAGES } from '@/constants/errorMessages'
 
 /**
  * Props du composant
@@ -270,6 +287,16 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+/**
+ * Auth store pour sauvegarder les textes
+ */
+const authStore = useAuthStore()
+
+/**
+ * État du modal de sauvegarde
+ */
+const showSaveModal = ref<boolean>(false)
 
 /**
  * Options d'alignement disponibles
@@ -343,6 +370,40 @@ function onFontLoadingState(isLoading: boolean): void {
 }
 
 /**
+ * Validate text content manually
+ */
+function validateText(content: string): string | null {
+  if (!content || content.trim().length === 0) {
+    return ERROR_MESSAGES.TEXT_EMPTY
+  }
+  if (content.length > 1000) {
+    return ERROR_MESSAGES.TEXT_TOO_LONG
+  }
+  return null
+}
+
+/**
+ * Validate font size manually
+ */
+function validateFontSizeValue(size: number): string | null {
+  if (size < 8 || size > 200) {
+    return ERROR_MESSAGES.FONT_SIZE_INVALID
+  }
+  return null
+}
+
+/**
+ * Validate color manually
+ */
+function validateColorValue(color: string): string | null {
+  const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
+  if (!hexRegex.test(color)) {
+    return ERROR_MESSAGES.COLOR_INVALID
+  }
+  return null
+}
+
+/**
  * Traite la soumission du formulaire
  */
 async function handleSubmit(): Promise<void> {
@@ -350,40 +411,87 @@ async function handleSubmit(): Promise<void> {
   const isValid = await $v.value.$validate()
 
   if (!isValid) {
-    console.warn('Formulaire invalide')
+    // Show specific validation errors
+    const textError = validateText(formData.text)
+    const sizeError = validateFontSizeValue(formData.fontSize)
+    const colorError = validateColorValue(formData.color)
+
+    if (textError) {
+      window.$message?.error(textError)
+      return
+    }
+    if (sizeError) {
+      window.$message?.error(sizeError)
+      return
+    }
+    if (colorError) {
+      window.$message?.error(colorError)
+      return
+    }
+
+    window.$message?.warning('Veuillez corriger les erreurs avant de soumettre')
     return
   }
 
-  if (props.isAdding) {
-    emit('textAdded', formData.text, formData.fontSize, formData.color, formData.fontFamily, currentFontCategory.value, {
-      isBold: formData.isBold,
-      isItalic: formData.isItalic,
-      isUnderline: formData.isUnderline
-    })
-  } else {
-    emit('textUpdated', formData.text, formData.fontSize, formData.color)
+  try {
+    if (props.isAdding) {
+      emit('textAdded', formData.text, formData.fontSize, formData.color, formData.fontFamily, currentFontCategory.value, {
+        isBold: formData.isBold,
+        isItalic: formData.isItalic,
+        isUnderline: formData.isUnderline
+      })
+      window.$message?.success('Texte ajouté avec succès!')
+    } else {
+      emit('textUpdated', formData.text, formData.fontSize, formData.color)
+      window.$message?.success('Texte modifié avec succès!')
+    }
+  } catch (error) {
+    window.$message?.error(ERROR_MESSAGES.SAVE_FAILED)
+    console.error('Error submitting text:', error)
   }
 }
 
 /**
- * Sauvegarde le style dans la bibliothèque
+ * Ouvre le modal de sauvegarde
  */
-function handleSaveToLibrary(): void {
-  const isValid = $v.value.$validate()
+function openSaveModal(): void {
+  showSaveModal.value = true
+}
 
-  if (!isValid) {
-    console.warn('Formulaire invalide')
-    return
+/**
+ * Traite l'enregistrement du texte dans la bibliothèque
+ * Appelé quand le modal SaveTextModal émet un événement 'save'
+ */
+async function handleSaveTextToLibrary(data: { label: string; type?: string }): Promise<void> {
+  try {
+    const textData = {
+      label: data.label,
+      type: (data.type || 'libre') as 'citation' | 'poeme' | 'libre',
+      content: {
+        text: formData.text,
+        fontFamily: formData.fontFamily,
+        fontSize: formData.fontSize,
+        fill: formData.color,
+        textAlign: formData.textAlign as 'left' | 'center' | 'right' | undefined,
+        fontWeight: (formData.isBold ? 'bold' : 'normal') as 'normal' | 'bold' | undefined,
+        fontStyle: (formData.isItalic ? 'italic' : 'normal') as 'normal' | 'italic' | undefined,
+        underline: formData.isUnderline
+      }
+    }
+
+    // Appel au store pour sauvegarder le texte
+    await authStore.addSavedText(textData)
+
+    // Afficher un message de succès
+    window.$message?.success('Texte enregistré dans la bibliothèque')
+
+    // Fermer le modal
+    showSaveModal.value = false
+  } catch (error) {
+    // Show user-friendly error message
+    window.$message?.error(ERROR_MESSAGES.LIBRARY_SAVE_FAILED)
+    console.error('Error saving text to library:', error)
   }
-
-  emit('savedToLibrary', {
-    fontFamily: formData.fontFamily,
-    fontSize: formData.fontSize,
-    color: formData.color,
-    isBold: formData.isBold,
-    isItalic: formData.isItalic,
-    isUnderline: formData.isUnderline
-  })
 }
 </script>
 
