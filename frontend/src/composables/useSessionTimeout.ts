@@ -27,8 +27,22 @@ const LOGOUT_TIME = 14 * 60 * 1000; // Auto-logout at 14 minutes
 
 export function useSessionTimeout() {
   const router = useRouter();
-  const notification = useNotification();
   const authStore = useAuthStore();
+
+  /**
+   * Get notification instance lazily
+   * This prevents calling useNotification() before the provider is mounted
+   * Returns null if provider is not available yet
+   */
+  const getNotification = () => {
+    try {
+      return useNotification();
+    } catch (error) {
+      // Provider not available yet - will retry on next call
+      console.warn('Notification provider not available yet');
+      return null;
+    }
+  };
 
   // Track timers
   let warningTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,6 +98,13 @@ export function useSessionTimeout() {
 
     warningShown.value = true;
 
+    // Get notification instance (may be null if provider not ready)
+    const notification = getNotification();
+    if (!notification) {
+      console.warn('Cannot show session warning: notification provider not available');
+      return;
+    }
+
     // Create a custom notification with action to extend session
     notification.warning({
       title: 'Session Expiring Soon',
@@ -109,22 +130,30 @@ export function useSessionTimeout() {
     // Reset the session timeout
     resetSessionTimeout();
 
-    notification.success({
-      title: 'Session Extended',
-      content: 'Your session has been extended for another 15 minutes.',
-      duration: 3,
-    });
+    // Get notification instance (may be null if provider not ready)
+    const notification = getNotification();
+    if (notification) {
+      notification.success({
+        title: 'Session Extended',
+        content: 'Your session has been extended for another 15 minutes.',
+        duration: 3,
+      });
+    }
   };
 
   /**
    * Perform automatic logout
    */
   const performAutoLogout = (): void => {
-    notification.error({
-      title: 'Session Expired',
-      content: 'Your session has expired due to inactivity. Please log in again.',
-      duration: 3,
-    });
+    // Get notification instance (may be null if provider not ready)
+    const notification = getNotification();
+    if (notification) {
+      notification.error({
+        title: 'Session Expired',
+        content: 'Your session has expired due to inactivity. Please log in again.',
+        duration: 3,
+      });
+    }
 
     // Logout user
     authStore.logout().catch(() => {

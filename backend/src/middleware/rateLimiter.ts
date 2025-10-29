@@ -58,8 +58,8 @@ export const generalLimiter = rateLimit({
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    // Skip rate limiting in development for localhost
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    // Skip rate limiting in development for localhost (both IPv4 and IPv6)
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;
@@ -87,7 +87,7 @@ export const loginLimiter = rateLimit({
   skipSuccessfulRequests: true, // Don't count successful logins
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;
@@ -114,7 +114,7 @@ export const registerLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;
@@ -141,7 +141,7 @@ export const passwordResetLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;
@@ -169,7 +169,7 @@ export const refreshLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;
@@ -194,7 +194,7 @@ export const profileUpdateLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;
@@ -219,7 +219,7 @@ export const passwordChangeLimiter = rateLimit({
   legacyHeaders: false,
   handler: rateLimitExceededHandler,
   skip: (req) => {
-    if (process.env['NODE_ENV'] === 'development' && req.ip === '127.0.0.1') {
+    if (process.env['NODE_ENV'] === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')) {
       return true;
     }
     return false;

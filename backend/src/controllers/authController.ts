@@ -173,12 +173,13 @@ export const login = async (
  * Logout user
  *
  * POST /api/auth/logout
- * Requires: JWT authentication
+ * Requires: Optional JWT authentication
  *
- * Clears authentication cookies and updates lastLogoutAt timestamp
+ * Clears authentication cookies and updates lastLogoutAt timestamp.
+ * If no valid token is provided, cookies are still cleared.
  *
  * @async
- * @param {AuthRequest} req - Express request with user data
+ * @param {AuthRequest} req - Express request with optional user data
  * @param {Response} res - Express response object
  * @param {NextFunction} next - Express next function
  *

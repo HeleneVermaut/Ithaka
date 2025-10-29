@@ -30,7 +30,7 @@ import {
   checkEmailUnique,
   checkPseudoUnique,
 } from '../controllers/authController';
-import { authenticateUser } from '../middleware/authMiddleware';
+import { optionalAuth } from '../middleware/authMiddleware';
 import {
   validate,
   registerSchema,
@@ -109,7 +109,11 @@ router.post(
 /**
  * @route   POST /api/auth/logout
  * @desc    Logout user (clear cookies and update lastLogoutAt)
- * @access  Private (requires JWT authentication)
+ * @access  Public (clears cookies regardless of token validity)
+ *
+ * Note: Authentication is optional. If a valid token is provided,
+ * the lastLogoutAt timestamp will be updated. If no token or an
+ * expired token is provided, cookies will still be cleared.
  *
  * Response: 200 OK
  * {
@@ -120,7 +124,7 @@ router.post(
  */
 router.post(
   '/logout',
-  authenticateUser,
+  optionalAuth,
   logout
 );
 
