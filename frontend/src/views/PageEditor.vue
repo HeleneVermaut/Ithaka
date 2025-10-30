@@ -1382,7 +1382,7 @@ watch(
 .offline-badge {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1420,6 +1420,9 @@ watch(
   border-bottom: 1px solid #e5e7eb;
   padding: 8px 16px;
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .toolbar-group {
