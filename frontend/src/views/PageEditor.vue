@@ -708,16 +708,11 @@ async function handleMediaUploaded(element: IPageElement): Promise<void> {
  * Handle emoji added from EmojiPicker
  * Creates a new emoji page element
  */
-async function handleEmojiAdded(element: IPageElement): Promise<void> {
-  try {
-    await pageElementsStore.createElement(element)
-    showEmojiPicker.value = false
-    message.success('Emoji ajouté au canvas')
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Erreur lors de l\'ajout de l\'emoji'
-    message.error(errorMsg)
-    console.error('Emoji add error:', error)
-  }
+function handleEmojiAdded(element: IPageElement): void {
+  // Element is already created by EmojiPicker component
+  // Just add it to the store state and close the modal
+  pageElementsStore.addElement(element)
+  showEmojiPicker.value = false
 }
 
 /**

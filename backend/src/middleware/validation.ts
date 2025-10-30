@@ -1332,10 +1332,11 @@ export const createPageElementSchema = Joi.object({
       'number.max': 'Opacity must be between 0 and 100',
     }),
 
-  stickerLibraryId: Joi.string()
-    .uuid({ version: 'uuidv4' })
-    .optional()
-    .allow('')
+  stickerLibraryId: Joi.alternatives().try(
+    Joi.string().uuid({ version: 'uuidv4' }),
+    Joi.string().allow(''),
+    Joi.any().allow(null)
+  ).optional()
     .messages({
       'string.uuid': 'Sticker library ID must be a valid UUID',
     }),
@@ -1358,7 +1359,7 @@ export const createPageElementSchema = Joi.object({
     .messages({
       'object.base': 'Metadata must be an object',
     }),
-}).unknown(false);
+}).unknown(true);
 
 /**
  * Joi schema for updating a page element (PATCH semantics)

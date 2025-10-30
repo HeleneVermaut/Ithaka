@@ -753,6 +753,25 @@ export const usePageElementsStore = defineStore('pageElements', () => {
     }
   }
 
+  /**
+   * Ajoute un élément déjà créé au state local (sans appel API)
+   *
+   * Utilisé quand un composant a déjà créé l'élément via l'API
+   * et on veut simplement le synchroniser dans le state Pinia.
+   *
+   * @param element - L'élément IPageElement à ajouter au state
+   * @example
+   * ```typescript
+   * // EmojiPicker a créé l'élément, on l'ajoute simplement au store
+   * pageElementsStore.addElement(newElement)
+   * ```
+   */
+  const addElement = (element: IPageElement): void => {
+    elements.value.push(element)
+    selectedElementIds.value = [element.id]
+    console.log('Page element added to store:', element.id)
+  }
+
   // ========================================
   // EXPORT DU STORE
   // ========================================
@@ -775,6 +794,7 @@ export const usePageElementsStore = defineStore('pageElements', () => {
     // Actions - Page Element CRUD
     loadPageElements,
     createElement,
+    addElement,
     updateElement,
     deleteElement,
     duplicateElement,
