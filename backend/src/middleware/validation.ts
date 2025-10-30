@@ -810,6 +810,7 @@ export const batchElementsSchema = Joi.array()
 /**
  * Joi schema for updating a single page element
  * Only mutable fields are allowed (x, y, width, height, rotation, zIndex, content, style, metadata)
+ * Note: pageId is allowed but not used for update (it's provided for context but immutable)
  */
 export const updateElementSchema = Joi.object({
   x: Joi.number()
@@ -881,6 +882,20 @@ export const updateElementSchema = Joi.object({
     .allow(null)
     .messages({
       'object.base': 'Metadata must be an object',
+    }),
+
+  pageId: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .optional()
+    .messages({
+      'string.uuid': 'Page ID must be a valid UUID',
+    }),
+
+  type: Joi.string()
+    .valid('text', 'image', 'emoji', 'sticker', 'shape', 'moodTracker')
+    .optional()
+    .messages({
+      'any.only': 'Type must be one of: text, image, emoji, sticker, shape, moodTracker',
     }),
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
