@@ -1489,6 +1489,32 @@ export const updatePageElementSchema = Joi.object({
     .messages({
       'string.uuid': 'Sticker library ID must be a valid UUID',
     }),
+
+  pageId: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .optional()
+    .messages({
+      'string.uuid': 'Page ID must be a valid UUID',
+    }),
+
+  content: Joi.object()
+    .optional()
+    .messages({
+      'object.base': 'Content must be an object',
+    }),
+
+  style: Joi.object()
+    .optional()
+    .messages({
+      'object.base': 'Style must be an object',
+    }),
+
+  metadata: Joi.object()
+    .optional()
+    .allow(null)
+    .messages({
+      'object.base': 'Metadata must be an object or null',
+    }),
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
 }).unknown(false);

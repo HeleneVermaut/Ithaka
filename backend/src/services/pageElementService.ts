@@ -313,7 +313,7 @@ export async function createPageElement(
 
     // Transform type-specific fields into content object
     if (data.type === 'emoji' && data.emojiContent) {
-      content = { ...content, code: data.emojiContent };
+      content = { ...content, emojiContent: data.emojiContent };
     }
 
     if ((data.type === 'image' || data.type === 'sticker') && data.cloudinaryUrl) {
