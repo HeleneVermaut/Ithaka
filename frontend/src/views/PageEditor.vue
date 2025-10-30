@@ -1373,6 +1373,7 @@ watch(
   height: 100vh;
   background-color: #f5f5f5;
   overflow: hidden;
+  position: relative;
 }
 
 /* ========================================
@@ -1420,9 +1421,12 @@ watch(
   border-bottom: 1px solid #e5e7eb;
   padding: 8px 16px;
   flex-wrap: wrap;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
+  height: fit-content;
 }
 
 .toolbar-group {
@@ -1450,6 +1454,7 @@ watch(
   flex: 1;
   overflow: hidden;
   gap: 0;
+  margin-top: 100px;
 }
 
 /* ========================================
