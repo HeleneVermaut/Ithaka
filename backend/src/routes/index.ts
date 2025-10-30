@@ -85,6 +85,27 @@ import pageRoutes from './pageRoutes';
 router.use(pageRoutes);
 
 /**
+ * Media Routes
+ * Handles media upload to Cloudinary and image transformations
+ */
+import mediaRoutes from './mediaRoutes';
+router.use('/media', mediaRoutes);
+
+/**
+ * Page Element Routes
+ * Handles page element CRUD operations (get, create, update, delete, duplicate, restore)
+ */
+import pageElementRoutes from './pageElementRoutes';
+router.use('/page-elements', pageElementRoutes);
+
+/**
+ * Sticker Library Routes
+ * Handles user sticker library management (get, upload, rename, delete)
+ */
+import stickerLibraryRoutes from './stickerLibraryRoutes';
+router.use('/user-library/stickers', stickerLibraryRoutes);
+
+/**
  * Export Routes
  * TODO: Import and mount export routes when implemented
  * Example:

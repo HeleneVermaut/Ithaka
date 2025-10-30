@@ -63,6 +63,9 @@ export interface IPageElement {
   /** Z-index for layer ordering (0 = bottom, higher = on top) */
   zIndex: number;
 
+  /** Optional foreign key to UserSticker (for sticker type elements) */
+  stickerLibraryId?: string | null;
+
   /**
    * Element content (type-specific data)
    * For text: { text, fontFamily, fontSize, fill, textAlign, fontWeight, fontStyle, underline, lineHeight }
@@ -106,6 +109,7 @@ export interface PageElementCreationAttributes
     | 'id'
     | 'rotation'
     | 'zIndex'
+    | 'stickerLibraryId'
     | 'metadata'
     | 'createdAt'
     | 'updatedAt'
@@ -131,6 +135,7 @@ export class PageElement extends Model<IPageElement, PageElementCreationAttribut
   declare height: number;
   declare rotation: number;
   declare zIndex: number;
+  declare stickerLibraryId?: string | null;
   declare content: Record<string, any>;
   declare style: Record<string, any>;
   declare metadata?: Record<string, any> | null;
@@ -325,6 +330,17 @@ PageElement.init(
       },
       comment: 'Z-index for layer ordering (0 = bottom)',
     },
+    stickerLibraryId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'user_stickers',
+        key: 'id',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL',
+      comment: 'Optional foreign key to UserSticker (for sticker type elements)',
+    },
     content: {
       type: DataTypes.JSONB,
       allowNull: false,
@@ -399,6 +415,10 @@ PageElement.init(
       {
         fields: ['page_id', 'z_index'],
         name: 'idx_element_page_zindex',
+      },
+      {
+        fields: ['sticker_library_id'],
+        name: 'idx_element_sticker',
       },
       {
         fields: ['created_at'],

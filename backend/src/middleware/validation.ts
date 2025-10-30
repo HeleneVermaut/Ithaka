@@ -21,6 +21,15 @@ import { AppError } from './errorHandler';
 import { logger } from '../utils/logger';
 
 /**
+ * Interface for Express Request with Multer file property
+ * Allows type-safe access to req.file for file upload handlers
+ * Using any to avoid Multer type issues across different versions
+ */
+interface MulterRequest extends Request {
+  file?: any;
+}
+
+/**
  * Custom Joi validator for strong passwords
  * Requires: 8+ chars, at least 1 uppercase, 1 lowercase, 1 number
  *
@@ -1122,6 +1131,602 @@ export const validate = (schema: Joi.ObjectSchema, property: 'body' | 'query' | 
 };
 
 /**
+ * US04 MEDIA OPERATIONS VALIDATION SCHEMAS
+ * ==========================================
+ *
+ * Schemas for media upload, page elements, transformations, and sticker operations
+ * as defined in US04-TASK09.
+ */
+
+/**
+ * Joi schema for media file upload validation
+ * Validates FormData with file size and MIME type checks
+ *
+ * Note: Multer parses file into req.file, not in body.
+ * This schema is for request body fields accompanying the file.
+ * File validation happens in middleware using fileValidation utilities.
+ *
+ * Constraints:
+ * - file: must be present, <= 10 MB
+ * - MIME type: one of image/jpeg, image/png, image/svg+xml
+ */
+export const uploadMediaSchema = Joi.object({
+  // File object is handled by Multer middleware, not Joi
+  // This schema validates any additional body/query parameters
+}).unknown(true); // Allow Multer's file object
+
+/**
+ * Joi schema for creating a page element (media, emoji, sticker, or shape)
+ * Validates positioning, dimensions, and element-specific properties
+ *
+ * IMPORTANT: All position and dimension values are in MILLIMETERS (mm) for consistency
+ * with PDF export and multi-format support. Frontend converts pixels to mm before sending.
+ *
+ * Constraints:
+ * - pageId: UUID required
+ * - type: enum (image, emoji, sticker, shape, text) required
+ * - x, y: number 0-2000mm required (page position)
+ * - width, height: number 0.5-3000mm required (element dimensions in millimeters)
+ * - rotation: number 0-360 optional (default 0)
+ * - zIndex: number 0-999 optional
+ * - cloudinaryUrl: URL string required if type === image/sticker
+ * - emojiContent: string 1-10 chars required if type === emoji
+ * - shapeType: enum (circle, square, rectangle, triangle, heart) required if type === shape
+ * - fillColor: hex color #RRGGBB required if type === shape
+ * - opacity: number 0-100 optional (default 100)
+ * - stickerLibraryId: UUID optional for sticker reference
+ * - content: object optional, contains element-specific data (text content, styling, etc.)
+ * - style: object optional, contains visual styling (fill, opacity, stroke, etc.)
+ */
+export const createPageElementSchema = Joi.object({
+  pageId: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .required()
+    .messages({
+      'string.uuid': 'Page ID must be a valid UUID',
+      'any.required': 'Page ID is required',
+    }),
+
+  type: Joi.string()
+    .valid('text', 'image', 'emoji', 'sticker', 'shape', 'moodTracker')
+    .required()
+    .messages({
+      'any.required': 'Element type is required',
+      'any.only': 'Type must be one of: text, image, emoji, sticker, shape, moodTracker',
+    }),
+
+  x: Joi.number()
+    .min(0)
+    .max(2000)
+    .required()
+    .messages({
+      'number.base': 'Position X must be a number',
+      'number.min': 'Position X must be between 0 and 2000',
+      'number.max': 'Position X must be between 0 and 2000',
+      'any.required': 'Position X is required',
+    }),
+
+  y: Joi.number()
+    .min(0)
+    .max(2000)
+    .required()
+    .messages({
+      'number.base': 'Position Y must be a number',
+      'number.min': 'Position Y must be between 0 and 2000',
+      'number.max': 'Position Y must be between 0 and 2000',
+      'any.required': 'Position Y is required',
+    }),
+
+  width: Joi.number()
+    .min(0.5)
+    .max(3000)
+    .required()
+    .messages({
+      'number.base': 'Width must be a number',
+      'number.min': 'Width must be between 0.5mm and 3000mm (minimum ~2px at 96 DPI)',
+      'number.max': 'Width must be between 0.5mm and 3000mm (maximum ~11339px at 96 DPI)',
+      'any.required': 'Width is required',
+    }),
+
+  height: Joi.number()
+    .min(0.5)
+    .max(3000)
+    .required()
+    .messages({
+      'number.base': 'Height must be a number',
+      'number.min': 'Height must be between 0.5mm and 3000mm (minimum ~2px at 96 DPI)',
+      'number.max': 'Height must be between 0.5mm and 3000mm (maximum ~11339px at 96 DPI)',
+      'any.required': 'Height is required',
+    }),
+
+  rotation: Joi.number()
+    .min(0)
+    .max(360)
+    .optional()
+    .default(0)
+    .messages({
+      'number.base': 'Rotation must be a number',
+      'number.min': 'Rotation must be between 0 and 360',
+      'number.max': 'Rotation must be between 0 and 360',
+    }),
+
+  zIndex: Joi.number()
+    .integer()
+    .min(0)
+    .max(999)
+    .optional()
+    .messages({
+      'number.base': 'Z-index must be a number',
+      'number.integer': 'Z-index must be an integer',
+      'number.min': 'Z-index must be between 0 and 999',
+      'number.max': 'Z-index must be between 0 and 999',
+    }),
+
+  cloudinaryUrl: Joi.when('type', {
+    is: Joi.string().valid('image', 'sticker'),
+    then: Joi.string()
+      .uri()
+      .required()
+      .messages({
+        'string.uri': 'Cloud URL must be a valid URI',
+        'any.required': 'Cloud URL is required for image and sticker elements',
+      }),
+    otherwise: Joi.string()
+      .uri()
+      .optional()
+      .allow(''),
+  }),
+
+  emojiContent: Joi.when('type', {
+    is: 'emoji',
+    then: Joi.string()
+      .min(1)
+      .max(10)
+      .required()
+      .messages({
+        'string.min': 'Emoji content must be at least 1 character',
+        'string.max': 'Emoji content must not exceed 10 characters',
+        'any.required': 'Emoji content is required for emoji elements',
+      }),
+    otherwise: Joi.string()
+      .optional()
+      .allow(''),
+  }),
+
+  shapeType: Joi.when('type', {
+    is: 'shape',
+    then: Joi.string()
+      .valid('circle', 'square', 'rectangle', 'triangle', 'heart')
+      .required()
+      .messages({
+        'any.only': 'Shape type must be one of: circle, square, rectangle, triangle, heart',
+        'any.required': 'Shape type is required for shape elements',
+      }),
+    otherwise: Joi.string()
+      .optional()
+      .allow(''),
+  }),
+
+  fillColor: Joi.when('type', {
+    is: 'shape',
+    then: Joi.string()
+      .pattern(/^#[0-9A-Fa-f]{6}$/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Fill color must be a valid hex color (#RRGGBB)',
+        'any.required': 'Fill color is required for shape elements',
+      }),
+    otherwise: Joi.string()
+      .optional()
+      .allow(''),
+  }),
+
+  opacity: Joi.number()
+    .min(0)
+    .max(100)
+    .optional()
+    .default(100)
+    .messages({
+      'number.base': 'Opacity must be a number',
+      'number.min': 'Opacity must be between 0 and 100',
+      'number.max': 'Opacity must be between 0 and 100',
+    }),
+
+  stickerLibraryId: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .optional()
+    .allow('')
+    .messages({
+      'string.uuid': 'Sticker library ID must be a valid UUID',
+    }),
+
+  content: Joi.object()
+    .optional()
+    .messages({
+      'object.base': 'Content must be an object',
+    }),
+
+  style: Joi.object()
+    .optional()
+    .messages({
+      'object.base': 'Style must be an object',
+    }),
+
+  metadata: Joi.object()
+    .optional()
+    .allow(null)
+    .messages({
+      'object.base': 'Metadata must be an object',
+    }),
+}).unknown(false);
+
+/**
+ * Joi schema for updating a page element (PATCH semantics)
+ * All fields are optional for partial updates
+ *
+ * IMPORTANT: Position and dimension values are in MILLIMETERS (mm)
+ * Same constraints as createPageElementSchema but all fields optional
+ */
+export const updatePageElementSchema = Joi.object({
+  type: Joi.string()
+    .valid('text', 'image', 'emoji', 'sticker', 'shape', 'moodTracker')
+    .optional()
+    .messages({
+      'any.only': 'Type must be one of: text, image, emoji, sticker, shape, moodTracker',
+    }),
+
+  x: Joi.number()
+    .min(0)
+    .max(2000)
+    .optional()
+    .messages({
+      'number.base': 'Position X must be a number',
+      'number.min': 'Position X must be between 0 and 2000mm',
+      'number.max': 'Position X must be between 0 and 2000mm',
+    }),
+
+  y: Joi.number()
+    .min(0)
+    .max(2000)
+    .optional()
+    .messages({
+      'number.base': 'Position Y must be a number',
+      'number.min': 'Position Y must be between 0 and 2000mm',
+      'number.max': 'Position Y must be between 0 and 2000mm',
+    }),
+
+  width: Joi.number()
+    .min(0.5)
+    .max(3000)
+    .optional()
+    .messages({
+      'number.base': 'Width must be a number',
+      'number.min': 'Width must be between 0.5mm and 3000mm (minimum ~2px at 96 DPI)',
+      'number.max': 'Width must be between 0.5mm and 3000mm (maximum ~11339px at 96 DPI)',
+    }),
+
+  height: Joi.number()
+    .min(0.5)
+    .max(3000)
+    .optional()
+    .messages({
+      'number.base': 'Height must be a number',
+      'number.min': 'Height must be between 0.5mm and 3000mm (minimum ~2px at 96 DPI)',
+      'number.max': 'Height must be between 0.5mm and 3000mm (maximum ~11339px at 96 DPI)',
+    }),
+
+  rotation: Joi.number()
+    .min(0)
+    .max(360)
+    .optional()
+    .messages({
+      'number.base': 'Rotation must be a number',
+      'number.min': 'Rotation must be between 0 and 360',
+      'number.max': 'Rotation must be between 0 and 360',
+    }),
+
+  zIndex: Joi.number()
+    .integer()
+    .min(0)
+    .max(999)
+    .optional()
+    .messages({
+      'number.base': 'Z-index must be a number',
+      'number.integer': 'Z-index must be an integer',
+      'number.min': 'Z-index must be between 0 and 999',
+      'number.max': 'Z-index must be between 0 and 999',
+    }),
+
+  cloudinaryUrl: Joi.string()
+    .uri()
+    .optional()
+    .allow('')
+    .messages({
+      'string.uri': 'Cloud URL must be a valid URI',
+    }),
+
+  emojiContent: Joi.string()
+    .min(1)
+    .max(10)
+    .optional()
+    .allow('')
+    .messages({
+      'string.min': 'Emoji content must be at least 1 character',
+      'string.max': 'Emoji content must not exceed 10 characters',
+    }),
+
+  shapeType: Joi.string()
+    .valid('circle', 'square', 'rectangle', 'triangle', 'heart')
+    .optional()
+    .allow('')
+    .messages({
+      'any.only': 'Shape type must be one of: circle, square, rectangle, triangle, heart',
+    }),
+
+  fillColor: Joi.string()
+    .pattern(/^#[0-9A-Fa-f]{6}$/)
+    .optional()
+    .allow('')
+    .messages({
+      'string.pattern.base': 'Fill color must be a valid hex color (#RRGGBB)',
+    }),
+
+  opacity: Joi.number()
+    .min(0)
+    .max(100)
+    .optional()
+    .messages({
+      'number.base': 'Opacity must be a number',
+      'number.min': 'Opacity must be between 0 and 100',
+      'number.max': 'Opacity must be between 0 and 100',
+    }),
+
+  stickerLibraryId: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .optional()
+    .allow('')
+    .messages({
+      'string.uuid': 'Sticker library ID must be a valid UUID',
+    }),
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update',
+}).unknown(false);
+
+/**
+ * Joi schema for image transformation operations
+ * Validates crop bounds and adjustment parameters
+ *
+ * Constraints:
+ * - crop: object { x, y, width, height } optional
+ *   - x, y: >= 0
+ *   - width, height: > 0
+ * - brightness: number -100 to 100 optional
+ * - contrast: number -100 to 100 optional
+ * - saturation: number -100 to 100 optional
+ * - rotation: enum [0, 90, 180, 270] optional
+ * - flip: enum [horizontal, vertical] optional
+ * - At least one transformation required
+ */
+export const transformImageSchema = Joi.object({
+  crop: Joi.object({
+    x: Joi.number()
+      .min(0)
+      .required()
+      .messages({
+        'number.base': 'Crop X must be a number',
+        'number.min': 'Crop X must be >= 0',
+        'any.required': 'Crop X is required when crop is specified',
+      }),
+
+    y: Joi.number()
+      .min(0)
+      .required()
+      .messages({
+        'number.base': 'Crop Y must be a number',
+        'number.min': 'Crop Y must be >= 0',
+        'any.required': 'Crop Y is required when crop is specified',
+      }),
+
+    width: Joi.number()
+      .greater(0)
+      .required()
+      .messages({
+        'number.base': 'Crop width must be a number',
+        'number.greater': 'Crop width must be > 0',
+        'any.required': 'Crop width is required when crop is specified',
+      }),
+
+    height: Joi.number()
+      .greater(0)
+      .required()
+      .messages({
+        'number.base': 'Crop height must be a number',
+        'number.greater': 'Crop height must be > 0',
+        'any.required': 'Crop height is required when crop is specified',
+      }),
+  })
+    .optional()
+    .messages({
+      'object.base': 'Crop must be an object',
+    }),
+
+  brightness: Joi.number()
+    .min(-100)
+    .max(100)
+    .optional()
+    .messages({
+      'number.base': 'Brightness must be a number',
+      'number.min': 'Brightness must be between -100 and 100',
+      'number.max': 'Brightness must be between -100 and 100',
+    }),
+
+  contrast: Joi.number()
+    .min(-100)
+    .max(100)
+    .optional()
+    .messages({
+      'number.base': 'Contrast must be a number',
+      'number.min': 'Contrast must be between -100 and 100',
+      'number.max': 'Contrast must be between -100 and 100',
+    }),
+
+  saturation: Joi.number()
+    .min(-100)
+    .max(100)
+    .optional()
+    .messages({
+      'number.base': 'Saturation must be a number',
+      'number.min': 'Saturation must be between -100 and 100',
+      'number.max': 'Saturation must be between -100 and 100',
+    }),
+
+  rotation: Joi.number()
+    .valid(0, 90, 180, 270)
+    .optional()
+    .messages({
+      'any.only': 'Rotation must be one of: 0, 90, 180, 270',
+    }),
+
+  flip: Joi.string()
+    .valid('horizontal', 'vertical')
+    .optional()
+    .messages({
+      'any.only': 'Flip must be one of: horizontal, vertical',
+    }),
+}).min(1).messages({
+  'object.min': 'At least one transformation must be provided',
+}).unknown(false);
+
+/**
+ * Joi schema for sticker upload
+ * Validates file upload with sticker metadata
+ *
+ * Constraints:
+ * - name: string 1-100 chars required
+ * - tags: array of strings max 10, each 1-30 chars optional
+ * - file: present, < 10 MB (validated via Multer middleware)
+ */
+export const stickerUploadSchema = Joi.object({
+  name: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      'string.empty': 'Sticker name is required',
+      'any.required': 'Sticker name is required',
+      'string.min': 'Sticker name must be at least 1 character',
+      'string.max': 'Sticker name must not exceed 100 characters',
+    }),
+
+  tags: Joi.array()
+    .items(
+      Joi.string()
+        .trim()
+        .min(1)
+        .max(30)
+        .messages({
+          'string.min': 'Each tag must be at least 1 character',
+          'string.max': 'Each tag must not exceed 30 characters',
+        })
+    )
+    .max(10)
+    .optional()
+    .default([])
+    .messages({
+      'array.base': 'Tags must be an array',
+      'array.max': 'Maximum 10 tags allowed',
+    }),
+}).unknown(true); // Allow Multer's file object
+
+/**
+ * Joi schema for renaming a sticker
+ * Validates new name and optional tags for renaming operation
+ *
+ * Constraints:
+ * - newName: string 1-100 chars required
+ * - newTags: array of strings max 10, each 1-30 chars optional
+ */
+export const renameStickerSchema = Joi.object({
+  newName: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      'string.empty': 'New name is required',
+      'any.required': 'New name is required',
+      'string.min': 'New name must be at least 1 character',
+      'string.max': 'New name must not exceed 100 characters',
+    }),
+
+  newTags: Joi.array()
+    .items(
+      Joi.string()
+        .trim()
+        .min(1)
+        .max(30)
+        .messages({
+          'string.min': 'Each tag must be at least 1 character',
+          'string.max': 'Each tag must not exceed 30 characters',
+        })
+    )
+    .max(10)
+    .optional()
+    .messages({
+      'array.base': 'Tags must be an array',
+      'array.max': 'Maximum 10 tags allowed',
+    }),
+}).unknown(false);
+
+/**
+ * Middleware function to validate file uploads
+ * Validates Multer req.file object for media uploads
+ *
+ * This validates the file AFTER Multer has processed it.
+ * Checks:
+ * - File exists and is not empty
+ * - File size <= 10 MB
+ * - MIME type is allowed
+ * - File format/extension is allowed
+ *
+ * @param {MulterRequest} req - Express request object with Multer file
+ * @param {Response} res - Express response object
+ * @param {NextFunction} next - Express next function
+ * @throws {AppError} If file validation fails
+ *
+ * @example
+ * router.post('/upload', upload.single('file'), validateFileUpload, controller.handleUpload);
+ */
+export const validateFileUpload = (req: Request, _res: Response, next: NextFunction): void => {
+  const multerReq = req as MulterRequest;
+  if (!multerReq.file) {
+    throw new AppError('File is required', 400);
+  }
+
+  // Check file size (Multer may filter, but double-check)
+  const maxSizeBytes = 10 * 1024 * 1024; // 10 MB
+  if (multerReq.file.size > maxSizeBytes) {
+    const sizeMB = (multerReq.file.size / (1024 * 1024)).toFixed(2);
+    throw new AppError(
+      `File too large (${sizeMB} MB > 10 MB)`,
+      400
+    );
+  }
+
+  // Check MIME type
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/svg+xml'];
+  if (!allowedMimes.includes(multerReq.file.mimetype)) {
+    throw new AppError(
+      `Invalid file type '${multerReq.file.mimetype}'. Allowed: image/jpeg, image/png, image/svg+xml`,
+      400
+    );
+  }
+
+  next();
+};
+
+/**
  * Sanitize email middleware
  *
  * Ensures email is lowercase and trimmed before processing.
@@ -1162,5 +1767,12 @@ export default {
   updateElementSchema,
   createSavedTextSchema,
   updateSavedTextSchema,
+  uploadMediaSchema,
+  createPageElementSchema,
+  updatePageElementSchema,
+  transformImageSchema,
+  stickerUploadSchema,
+  renameStickerSchema,
+  validateFileUpload,
   sanitizeEmail,
 };

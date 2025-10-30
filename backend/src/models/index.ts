@@ -15,6 +15,7 @@ export { Notebook } from './Notebook';
 export { NotebookPermissions } from './NotebookPermissions';
 export { Page } from './Page'; // US03
 export { PageElement, type ElementType } from './PageElement'; // US03+
+export { UserSticker, type IUserSticker, type UserStickerCreationAttributes } from './UserSticker'; // US04
 export { TokenBlacklist, type ITokenBlacklist, type TokenBlacklistCreationAttributes } from './TokenBlacklist';
 
 // Initialize all model associations after models are loaded

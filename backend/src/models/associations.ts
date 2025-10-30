@@ -21,6 +21,7 @@ import { Notebook } from './Notebook';
 import { NotebookPermissions } from './NotebookPermissions';
 import { Page } from './Page';
 import { PageElement } from './PageElement';
+import { UserSticker } from './UserSticker';
 
 /**
  * Initialize all model associations
@@ -75,6 +76,30 @@ export function initializeAssociations(): void {
   PageElement.belongsTo(Page, {
     foreignKey: 'pageId',
     as: 'page',
+  });
+
+  // User <-> UserSticker (one-to-many) - US04
+  User.hasMany(UserSticker, {
+    foreignKey: 'userId',
+    as: 'stickers',
+    onDelete: 'CASCADE',
+  });
+
+  UserSticker.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  // UserSticker <-> PageElement (one-to-many) - US04
+  UserSticker.hasMany(PageElement, {
+    foreignKey: 'stickerLibraryId',
+    as: 'pageElements',
+    onDelete: 'SET NULL',
+  });
+
+  PageElement.belongsTo(UserSticker, {
+    foreignKey: 'stickerLibraryId',
+    as: 'sticker',
   });
 }
 

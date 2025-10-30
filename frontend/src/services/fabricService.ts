@@ -156,6 +156,9 @@ export function serializeElement(fabricObject: fabric.Object): SerializedElement
     content.fontStyle = fabricObject.fontStyle || 'normal'
     content.textAlign = fabricObject.textAlign || 'left'
     content.lineHeight = fabricObject.lineHeight || 1.16
+    // IMPORTANT: Store fill color in content for text elements
+    // This ensures CanvasElement.vue can find it under elementContent.fill
+    content.fill = fabricObject.fill || '#000000'
   }
 
   // Extract style properties
@@ -166,9 +169,16 @@ export function serializeElement(fabricObject: fabric.Object): SerializedElement
     strokeWidth: fabricObject.strokeWidth || 0
   }
 
+  // Normalize Fabric.js type names to backend-compatible types
+  // Fabric.js uses 'textbox' but backend expects 'text'
+  let normalizedType = fabricObject.type || 'object'
+  if (normalizedType === 'textbox') {
+    normalizedType = 'text'
+  }
+
   return {
     id: (fabricObject.data?.id as string) || crypto.randomUUID(),
-    type: fabricObject.type || 'object',
+    type: normalizedType,
     x: convertPxToMm(left),
     y: convertPxToMm(top),
     width: convertPxToMm(width),
@@ -214,7 +224,8 @@ export function deserializeElement(data: SerializedElement): fabric.Object {
       height: heightPx,
       fontFamily: data.content.fontFamily || 'Arial',
       fontSize: data.content.fontSize || 12,
-      fill: data.style.fill || '#000000',
+      // IMPORTANT: Read fill from content first (new format), fallback to style (legacy)
+      fill: data.content.fill || data.style.fill || '#000000',
       fontWeight: data.content.fontWeight || 'normal',
       fontStyle: data.content.fontStyle || 'normal',
       textAlign: data.content.textAlign || 'left',

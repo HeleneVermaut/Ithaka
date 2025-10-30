@@ -19,7 +19,6 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
-import { useAuthStore } from '@/stores/auth'
 import { DEBUG, showDebugIndicator } from './utils/debug'
 
 // Styles globaux de l'application
@@ -53,31 +52,15 @@ const bootstrapApp = async (): Promise<void> => {
   /**
    * Vue Router : Gestion de la navigation
    * Doit être installé APRÈS Pinia car il utilise le store auth
+   *
+   * Important: La restauration de la session est maintenant gérée dans le router guard
+   * (voir router/index.ts - beforeEach hook) pour éviter les "flashes" et gérer
+   * les cas d'erreur de manière cohérente.
    */
   app.use(router)
 
   // ========================================
-  // 3. RESTAURATION DE LA SESSION
-  // ========================================
-
-  /**
-   * Vérifie si un token JWT existe dans les cookies httpOnly
-   * et restaure la session de l'utilisateur si possible.
-   *
-   * Cela permet de rester connecté même après fermeture du navigateur.
-   * Si le token est expiré ou invalide, l'utilisateur restera simplement déconnecté.
-   */
-  const authStore = useAuthStore()
-  try {
-    await authStore.fetchProfile()
-    console.log('Session restored successfully')
-  } catch (error) {
-    // Token expiré ou invalide - l'utilisateur reste déconnecté (comportement normal)
-    console.warn('No active session, user will need to login')
-  }
-
-  // ========================================
-  // 4. MONTAGE DE L'APPLICATION
+  // 3. MONTAGE DE L'APPLICATION
   // ========================================
 
   /**
@@ -89,7 +72,7 @@ const bootstrapApp = async (): Promise<void> => {
   console.log('Application Ithaka mounted successfully')
 
   // ========================================
-  // 5. ENABLE DEBUG MODE IF REQUESTED
+  // 4. ENABLE DEBUG MODE IF REQUESTED
   // ========================================
 
   /**
@@ -102,7 +85,7 @@ const bootstrapApp = async (): Promise<void> => {
 }
 
 // ========================================
-// 5. LANCEMENT DE L'APPLICATION
+// 4. LANCEMENT DE L'APPLICATION
 // ========================================
 
 /**

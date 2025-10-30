@@ -630,3 +630,274 @@ export interface BatchElementsResponse {
   /** Nombre d'éléments mis à jour */
   updated: number
 }
+
+// ========================================
+// MEDIA & STICKER MODELS (US04)
+// ========================================
+
+/**
+ * Type énumération pour les types de formes géométriques
+ *
+ * Utilisé par les éléments de type 'shape'
+ */
+export type ShapeType = 'circle' | 'square' | 'rectangle' | 'triangle' | 'heart'
+
+/**
+ * Réponse de Cloudinary après un upload
+ *
+ * Contient les métadonnées d'une image uploadée vers Cloudinary
+ */
+export interface ICloudinaryResponse {
+  /** URL complète de l'image sur Cloudinary */
+  cloudinaryUrl: string
+
+  /** ID public Cloudinary (utilisé pour les transformations) */
+  cloudinaryPublicId: string
+
+  /** Largeur originale de l'image en pixels */
+  width: number
+
+  /** Hauteur originale de l'image en pixels */
+  height: number
+
+  /** Format de l'image (jpeg, png, webp, etc.) */
+  format: string
+}
+
+/**
+ * Objet de transformations d'image Cloudinary
+ *
+ * Définit les transformations à appliquer à une image
+ * via l'API Cloudinary
+ */
+export interface ITransformations {
+  /** Crop: définit la région de l'image à conserver */
+  crop?: {
+    /** Coordonnée X du coin supérieur gauche du crop */
+    x: number
+    /** Coordonnée Y du coin supérieur gauche du crop */
+    y: number
+    /** Largeur de la région à conserver */
+    width: number
+    /** Hauteur de la région à conserver */
+    height: number
+  }
+
+  /** Brighness: ajuste la luminosité (-100 à 100) */
+  brightness?: number
+
+  /** Contrast: ajuste le contraste (-100 à 100) */
+  contrast?: number
+
+  /** Saturation: ajuste la saturation des couleurs (-100 à 100) */
+  saturation?: number
+
+  /** Rotation: tourne l'image (0, 90, 180, ou 270 degrés) */
+  rotation?: 0 | 90 | 180 | 270
+
+  /** Flip: retourne l'image horizontalement ou verticalement */
+  flip?: 'horizontal' | 'vertical'
+}
+
+/**
+ * Élément média d'une page étendu avec propriétés spécifiques aux médias
+ *
+ * Représente un élément de page qui est une image, un sticker ou une forme
+ * avec support des transformations et métadonnées Cloudinary
+ */
+export interface IPageElementMedia extends IPageElement {
+  /** URL complète de l'image sur Cloudinary (images uniquement) */
+  cloudinaryUrl?: string
+
+  /** ID public Cloudinary pour les transformations (images uniquement) */
+  cloudinaryPublicId?: string
+
+  /** Contenu emoji (emojis uniquement, par ex: "😀") */
+  emojiContent?: string
+
+  /** Type de forme géométrique (shapes uniquement) */
+  shapeType?: ShapeType
+
+  /** Couleur de remplissage de la forme en hexadécimal (shapes uniquement) */
+  fillColor?: string
+
+  /** Opacité de l'élément (0-100) */
+  opacity?: number
+}
+
+/**
+ * Entrée pour créer un nouvel élément média
+ *
+ * Utilisé pour les requêtes POST /api/page-elements
+ */
+export interface IPageElementInput {
+  /** ID de la page parente */
+  pageId: string
+
+  /** Type d'élément */
+  type: ElementType
+
+  /** Position X en millimètres */
+  x: number
+
+  /** Position Y en millimètres */
+  y: number
+
+  /** Largeur en millimètres */
+  width: number
+
+  /** Hauteur en millimètres */
+  height: number
+
+  /** Rotation en degrés (optionnel) */
+  rotation?: number
+
+  /** Ordre d'affichage Z (optionnel) */
+  zIndex?: number
+
+  /** URL Cloudinary pour les images (optionnel) */
+  cloudinaryUrl?: string
+
+  /** ID public Cloudinary (optionnel) */
+  cloudinaryPublicId?: string
+
+  /** Contenu emoji (optionnel) */
+  emojiContent?: string
+
+  /** Type de forme (optionnel) */
+  shapeType?: ShapeType
+
+  /** Couleur de remplissage (optionnel, hex) */
+  fillColor?: string
+
+  /** Opacité (optionnel, 0-100) */
+  opacity?: number
+
+  /** ID de sticker dans la bibliothèque utilisateur (optionnel) */
+  stickerLibraryId?: string | null
+
+  /** Contenu structuré de l'élément (optionnel, peut être construit depuis les champs spécifiques au type) */
+  content?: Record<string, any>
+
+  /** Propriétés de style visuel (optionnel) */
+  style?: Record<string, any>
+
+  /** Métadonnées personnalisées (optionnel) */
+  metadata?: Record<string, any>
+}
+
+/**
+ * Mise à jour partielle d'un élément média
+ *
+ * Utilisé pour les requêtes PATCH /api/page-elements/:id
+ * Tous les champs sont optionnels
+ */
+export interface IPageElementUpdate extends Partial<IPageElementInput> {}
+
+/**
+ * Sticker utilisateur sauvegardé dans la bibliothèque
+ *
+ * Représente un sticker créé par l'utilisateur et stocké dans sa bibliothèque
+ * pour une réutilisation rapide
+ */
+export interface IUserSticker {
+  /** Identifiant unique du sticker (UUID) */
+  id: string
+
+  /** ID de l'utilisateur propriétaire du sticker */
+  userId: string
+
+  /** Nom/titre du sticker (max 100 caractères) */
+  name: string
+
+  /** URL complète du sticker sur Cloudinary */
+  cloudinaryUrl: string
+
+  /** ID public Cloudinary du sticker */
+  cloudinaryPublicId: string
+
+  /** URL de la miniature du sticker */
+  thumbnailUrl: string
+
+  /** Étiquettes/tags associés au sticker pour la recherche */
+  tags: string[]
+
+  /** Indique si le sticker est public ou privé */
+  isPublic: boolean
+
+  /** Nombre de fois que ce sticker a été utilisé dans les journaux */
+  usageCount: number
+
+  /** Date de création du sticker (ISO 8601) */
+  createdAt: string
+
+  /** Date de dernière modification (ISO 8601) */
+  updatedAt: string
+}
+
+/**
+ * Données pour créer un nouveau sticker dans la bibliothèque
+ *
+ * Utilisé pour le formulaire d'upload de sticker
+ */
+export interface IUserStickerInput {
+  /** Fichier image du sticker */
+  file: File
+
+  /** Nom du sticker */
+  name: string
+
+  /** Tags associés au sticker (optionnel) */
+  tags?: string[]
+}
+
+/**
+ * Mise à jour d'un sticker existant
+ *
+ * Utilisé pour les requêtes PATCH /api/user-library/stickers/:id
+ */
+export interface IUserStickerUpdate {
+  /** Nouveau nom du sticker (optionnel) */
+  newName?: string
+
+  /** Nouveaux tags (optionnel) */
+  newTags?: string[]
+}
+
+// ========================================
+// RE-EXPORTS: US04 Type Modules
+// ========================================
+
+/**
+ * Re-export all types from pageElement module for convenience
+ *
+ * Allows importing US04 page element types from this central models file.
+ */
+export type {
+  PageElementsListResponse,
+  PageElementResponse,
+  IImageContent,
+  IShapeContent,
+  IStickerContent,
+} from './pageElement'
+
+/**
+ * Re-export all types from media module for convenience
+ *
+ * Allows importing US04 media types from this central models file.
+ */
+export type {
+  IImageTransformations,
+  ITransformationMetadata,
+  ImageTransformationApiResponse,
+} from './media'
+
+/**
+ * Re-export all types from sticker module for convenience
+ *
+ * Allows importing US04 sticker library types from this central models file.
+ */
+export type {
+  IUserStickerUploadRequest,
+  IUserStickerUpdateRequest,
+} from './sticker'

@@ -254,14 +254,70 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Initialisation/restauration automatique de la session utilisateur
+   *
+   * Appelle GET /api/auth/verify pour valider les cookies JWT httpOnly et
+   * restaurer la session utilisateur au démarrage de l'application.
+   *
+   * Cette méthode est appelée au démarrage (main.ts ou router guard) pour :
+   * - Vérifier si l'utilisateur est toujours connecté (cookies valides)
+   * - Restaurer son profil sans qu'il n'ait à se reconnecter
+   * - Permettre une navigation transparente après un refresh de page
+   *
+   * En cas d'erreur (401 token expiré, 500 erreur serveur), la session
+   * n'est pas restaurée mais aucune erreur n'est affichée à l'utilisateur
+   * (comportement "silent" préféré au démarrage pour éviter les notifications
+   * intempestives).
+   *
+   * @returns Promise<boolean> - true si session restaurée avec succès, false sinon
+   *
+   * @example
+   * ```typescript
+   * const authStore = useAuthStore()
+   * const sessionRestored = await authStore.initializeSession()
+   * if (sessionRestored) {
+   *   console.log('Session restored:', authStore.user)
+   * } else {
+   *   console.log('No active session')
+   * }
+   * ```
+   */
+  const initializeSession = async (): Promise<boolean> => {
+    try {
+      // Appel silencieux à l'endpoint de vérification de session
+      // Pas de modification du loading flag car c'est une opération silencieuse au démarrage
+      const userData = await authService.getProfile()
+
+      // Mise à jour du state avec les données utilisateur
+      user.value = userData
+
+      // Session restaurée avec succès
+      return true
+    } catch (err: unknown) {
+      // Gestion silencieuse des erreurs au démarrage
+      // Token expiré/invalide ou erreur serveur = comportement normal au premier démarrage
+      // Pas de console.error pour éviter le bruit dans les logs en production
+      if (err instanceof Error) {
+        // En debug mode uniquement
+        if (import.meta.env.DEV) {
+          console.log('Session initialization failed (expected if no active session):', err.message)
+        }
+      }
+
+      // Session non restaurée, utilisateur reste déconnecté
+      return false
+    }
+  }
+
+  /**
    * Récupération du profil utilisateur depuis le backend
    *
    * Appelle GET /api/users/profile pour récupérer les informations complètes
    * de l'utilisateur authentifié (vérifié via les cookies httpOnly).
    *
    * Cette méthode est appelée :
-   * - Au démarrage de l'application (restoreSession)
    * - Après une mise à jour de profil pour rafraîchir les données
+   * - Pour forcer une synchronisation du profil avec le backend
    *
    * @throws Error si le token est invalide/expiré (401) ou utilisateur introuvable (404)
    *
@@ -843,6 +899,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
 
     // Actions
+    initializeSession,
     register,
     login,
     logout,

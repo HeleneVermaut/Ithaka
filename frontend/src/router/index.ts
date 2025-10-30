@@ -116,25 +116,65 @@ const router = createRouter({
 })
 
 /**
+ * État de suivi de l'initialisation de la session
+ *
+ * Utilisé pour s'assurer que initializeSession() n'est appelé qu'une seule fois
+ * au démarrage de l'application, avant la première navigation.
+ * Cela évite des appels inutiles lors de chaque changement de route.
+ */
+let sessionInitialized = false
+
+/**
  * Navigation Guard Globale
  *
  * S'exécute AVANT chaque changement de route pour vérifier :
+ * - Au premier appel: Restaurer la session utilisateur (initializeSession)
  * - Si la route nécessite une authentification (requiresAuth)
  * - Si l'utilisateur est connecté
  * - Si la route doit être cachée pour les utilisateurs connectés (hideForAuth)
+ *
+ * Architecture du flux:
+ * 1. Premier changement de route → initializeSession() est appelé une seule fois
+ *    - Vérifie les cookies JWT et restaure le profil utilisateur
+ *    - Permet une navigation transparente sans "flash" de login
+ * 2. Les changements de route suivants ignorent la vérification de session
+ * 3. Protection des routes authentifiées via requiresAuth
  *
  * @param to - Route de destination
  * @param from - Route actuelle
  * @param next - Fonction pour continuer/bloquer la navigation
  */
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
 
-  // Mise à jour du titre de la page
+  // ========================================
+  // ÉTAPE 1: Restauration de la session (une seule fois au démarrage)
+  // ========================================
+
+  if (!sessionInitialized) {
+    sessionInitialized = true
+
+    try {
+      // Tentative silencieuse de restauration de la session
+      // Cette action ne modifie pas l'état d'erreur/loading car elle est silencieuse
+      await authStore.initializeSession()
+    } catch (error: unknown) {
+      // Les erreurs sont gérées silencieusement dans initializeSession()
+      // L'utilisateur reste simplement déconnecté s'il n'y a pas de session valide
+    }
+  }
+
+  // ========================================
+  // ÉTAPE 2: Mise à jour du titre de la page
+  // ========================================
+
   const defaultTitle = import.meta.env.VITE_APP_TITLE
   document.title = to.meta.title ? `${to.meta.title} - ${defaultTitle}` : defaultTitle
 
-  // Vérification de l'authentification
+  // ========================================
+  // ÉTAPE 3: Vérification de l'authentification
+  // ========================================
+
   const requiresAuth = to.meta.requiresAuth as boolean
   const hideForAuth = to.meta.hideForAuth as boolean
   const isAuthenticated = authStore.isAuthenticated
@@ -157,7 +197,10 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
-  // Autoriser la navigation
+  // ========================================
+  // ÉTAPE 4: Autorisation de la navigation
+  // ========================================
+
   next()
 })
 
