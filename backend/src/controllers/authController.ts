@@ -512,6 +512,100 @@ export const checkPseudoUnique = async (
   }
 };
 
+/**
+ * Verify user session by validating JWT token
+ *
+ * GET /api/auth/verify
+ * Requires: authMiddleware (validates token in cookies)
+ *
+ * This endpoint allows the frontend to verify if the current session is valid
+ * without generating new tokens. It is used during app startup to restore the user's session.
+ *
+ * Security features:
+ * - NO new tokens are generated (no side effects)
+ * - Token is just validated, not refreshed
+ * - Returns 401 if token is invalid or expired
+ * - Does NOT auto-refresh if access token is expired but refresh token is valid
+ * - User data is returned only if the current access token is valid
+ *
+ * @async
+ * @param {AuthRequest} req - Express request with authenticated user data
+ * @param {Response} res - Express response object
+ * @param {NextFunction} next - Express next function
+ *
+ * @returns {object} JSON response with user data if session is valid
+ * @throws {AppError} 401 if token is invalid, expired, or missing
+ *
+ * @example
+ * // Request
+ * GET /api/auth/verify
+ * Cookies: accessToken=<valid-jwt>
+ *
+ * // Success response (200 OK)
+ * {
+ *   "success": true,
+ *   "message": "Session is valid",
+ *   "user": {
+ *     "id": "123e4567-e89b-12d3-a456-426614174000",
+ *     "email": "user@example.com",
+ *     "firstName": "John",
+ *     "lastName": "Doe",
+ *     "pseudo": "johndoe",
+ *     "bio": "Travel enthusiast",
+ *     "avatarBase64": null,
+ *     "isEmailVerified": true,
+ *     "lastLoginAt": "2024-01-27T10:30:00Z",
+ *     "lastLogoutAt": null,
+ *     "createdAt": "2024-01-20T15:00:00Z",
+ *     "updatedAt": "2024-01-27T10:30:00Z"
+ *   }
+ * }
+ *
+ * @example
+ * // Error response (401 Unauthorized) - token expired or invalid
+ * {
+ *   "status": "fail",
+ *   "statusCode": 401,
+ *   "message": "Your session has expired. Please log in again."
+ * }
+ */
+export const verifySession = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // At this point, authMiddleware has already validated the token and attached user data to req.user
+    // If we reach here, the token is valid and not expired
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new AppError('User information not found in token', 401);
+    }
+
+    // Import User model
+    const { User } = await import('../models/User');
+
+    // Fetch full user data from database (token only contains userId and role)
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      logger.warn('User not found in database despite valid token', { userId });
+      throw new AppError('User not found. Please log in again.', 401);
+    }
+
+    logger.info('Session verified successfully', { userId });
+
+    res.status(200).json({
+      success: true,
+      message: 'Session is valid',
+      user: user.toSafeJSON(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   register,
   login,
@@ -522,4 +616,5 @@ export default {
   resetPasswordWithToken,
   checkEmailUnique,
   checkPseudoUnique,
+  verifySession,
 };

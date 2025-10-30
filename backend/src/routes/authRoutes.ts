@@ -29,8 +29,9 @@ import {
   resetPasswordWithToken,
   checkEmailUnique,
   checkPseudoUnique,
+  verifySession,
 } from '../controllers/authController';
-import { optionalAuth } from '../middleware/authMiddleware';
+import { authenticateUser, optionalAuth } from '../middleware/authMiddleware';
 import {
   validate,
   registerSchema,
@@ -256,5 +257,59 @@ router.get('/check-email', checkEmailUnique);
  * Used by frontend for async validation (Vuelidate) during registration
  */
 router.get('/check-pseudo', checkPseudoUnique);
+
+/**
+ * @route   GET /api/auth/verify
+ * @desc    Verify user session by validating JWT token
+ * @access  Protected (requires valid JWT in httpOnly cookie)
+ *
+ * This endpoint is used by the frontend during app startup to verify if the user's session
+ * is still valid without generating new tokens. It is a read-only operation with no side effects.
+ *
+ * Security:
+ * - NO tokens are generated or refreshed
+ * - NO side effects (no database writes)
+ * - Token is just validated for correctness and expiration
+ * - Returns 401 if token is invalid or expired
+ * - Does NOT auto-refresh even if refresh token is valid
+ *
+ * Request: GET /api/auth/verify
+ * Cookies: accessToken=<jwt-token>
+ *
+ * Response: 200 OK (if session is valid)
+ * {
+ *   "success": true,
+ *   "message": "Session is valid",
+ *   "user": {
+ *     "id": "uuid",
+ *     "email": "user@example.com",
+ *     "firstName": "John",
+ *     "lastName": "Doe",
+ *     "pseudo": "johndoe",
+ *     "bio": "Travel enthusiast",
+ *     "isEmailVerified": true,
+ *     "lastLoginAt": "2024-01-27T10:30:00Z",
+ *     "createdAt": "2024-01-20T15:00:00Z",
+ *     "updatedAt": "2024-01-27T10:30:00Z"
+ *   }
+ * }
+ *
+ * Response: 401 Unauthorized (if token invalid/expired)
+ * {
+ *   "status": "fail",
+ *   "statusCode": 401,
+ *   "message": "Your session has expired. Please log in again."
+ * }
+ *
+ * Use cases:
+ * - App startup: Restore user session if access token is still valid
+ * - Token validation: Check if current session is valid before making API calls
+ * - Session refresh on page reload: Verify session without re-authentication
+ */
+router.get(
+  '/verify',
+  authenticateUser,
+  verifySession
+);
 
 export default router;
